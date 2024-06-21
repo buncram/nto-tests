@@ -1,8 +1,135 @@
 use utralib::generated::*;
-use utralib::utra::sysctrl;
+use xous_pl230::*;
 
-use crate::debug;
 use crate::utils::*;
+
+pub fn rram_tests_early() {
+    let mut rbk = [0u32; 16];
+    let rram = 0x6010_0000 as *mut u32;
+    let rram_ctl = 0x4000_0000 as *mut u32;
+    report_api(0x3e3a_1770);
+    unsafe {
+        // readback
+        for (i, r) in rbk.iter_mut().enumerate() {
+            *r = rram.add(i).read_volatile();
+        }
+        for &r in rbk.iter() {
+            report_api(r);
+        }
+
+        // this writes bytes in linear order
+        // rram.add(0).write_volatile(0x1234_1234);
+        // rram.add(1).write_volatile(0xfeed_face);
+        // rram.add(2).write_volatile(0x3141_5926);
+        // rram.add(3).write_volatile(0x1111_1111);
+        // rram.add(4).write_volatile(0xc0de_f00d);
+        // rram.add(5).write_volatile(0xace0_bace);
+        // rram.add(6).write_volatile(0x600d_c0de);
+        // rram.add(7).write_volatile(0x2222_2222);
+
+        // this was an attempt to reverse/swap byte writing orders to
+        // see how this impacts the RRAM receiver
+        rram.add(1).write_volatile(0x2222_2222);
+        rram.add(0).write_volatile(0x1111_1111);
+        rram.add(2).write_volatile(0x3333_3333);
+        rram.add(3).write_volatile(0x4444_4444);
+        rram.add(4).write_volatile(0x5555_5555);
+        rram.add(5).write_volatile(0x6666_6666);
+        rram.add(7).write_volatile(0x8888_8888);
+        rram.add(6).write_volatile(0x7777_7777);
+        rram_ctl.add(0).write_volatile(2);
+        rram.add(0).write_volatile(0x5200);
+        rram.add(0).write_volatile(0x9528);
+        rram_ctl.add(0).write_volatile(0);
+    }
+    report_api(0x3e3a_1771); // make some delay while RRAM processes
+    let mut reram = Reram::new();
+    let test_data: [u32; 8] = [
+        0xeeee_eeee,
+        0xbabe_600d,
+        0x3141_5926,
+        0x3333_3333,
+        0xc0de_f00d,
+        0xace0_bace,
+        0x600d_c0de,
+        0x1010_1010,
+    ];
+    unsafe {
+        reram.write_u32_aligned_dma(8, &test_data);
+        rram_ctl.add(0).write_volatile(2);
+        rram.add(0).write_volatile(0x5200);
+        rram.add(0).write_volatile(0x9528);
+        rram_ctl.add(0).write_volatile(0);
+
+        core::arch::asm!(".word 0x500F",);
+        report_api(0x3e3a_1772); // make some delay while RRAM processes
+        // readback
+        for (i, r) in rbk.iter_mut().enumerate() {
+            *r = rram.add(i).read_volatile();
+        }
+        for (i, &r) in rbk.iter().enumerate() {
+            if i == 8 {
+                report_api(0x3e3a_1773);
+            }
+            report_api(r);
+        }
+    };
+}
+
+pub fn rram_tests_late() {
+    let mut uart = crate::debug::Uart {};
+    let rram_base = 0x6000_0000 as *const u32;
+    uart.tiny_write_str("0x6000_0000:\r");
+    for i in 0..8 {
+        report_api(unsafe { rram_base.add(i).read_volatile() });
+    }
+    uart.tiny_write_str("0x6020_0000:\r");
+    for i in 0..8 {
+        report_api(unsafe { rram_base.add(i + 0x20_0000 / core::mem::size_of::<u32>()).read_volatile() });
+    }
+    uart.tiny_write_str("0x603f8000:\r");
+    for i in 0..8 {
+        report_api(unsafe { rram_base.add(i + 0x3F_8000 / core::mem::size_of::<u32>()).read_volatile() });
+    }
+    /*
+    let mut reram = Reram::new();
+    let test_data: [u32; 8] = [
+        0x1234_1234,
+        0xfeed_face,
+        0x3141_5926,
+        0x1111_1111,
+        0xc0de_f00d,
+        0xace0_bace,
+        0x600d_c0de,
+        0x2222_2222
+    ];
+    unsafe {reram.write_u32_aligned(0, &test_data)};*/
+    unsafe {
+        let rram_ctl = 0x4000_0000 as *mut u32;
+        let rram = 0x6000_0000 as *mut u32;
+        rram.add(0).write_volatile(0x1234_1234);
+        rram.add(1).write_volatile(0xfeed_face);
+        rram.add(2).write_volatile(0x3141_5926);
+        rram.add(3).write_volatile(0x1111_1111);
+        rram.add(4).write_volatile(0xc0de_f00d);
+        rram.add(5).write_volatile(0xace0_bace);
+        rram.add(6).write_volatile(0x600d_c0de);
+        rram.add(7).write_volatile(0x2222_2222);
+        rram_ctl.add(0).write_volatile(2);
+        rram.add(0).write_volatile(0x5200);
+        rram.add(0).write_volatile(0x9528);
+        rram_ctl.add(0).write_volatile(0);
+    }
+
+    uart.tiny_write_str("0x6020_0000:\r");
+    for i in 0..8 {
+        report_api(unsafe { rram_base.add(i + 0x20_0000 / core::mem::size_of::<u32>()).read_volatile() });
+    }
+    uart.tiny_write_str("0x6000_0000:\r");
+    for i in 0..8 {
+        report_api(unsafe { rram_base.add(i).read_volatile() });
+    }
+}
 
 pub mod rrc {
     pub const RRC_LOAD_BUFFER: u32 = 0x5200;
@@ -58,7 +185,6 @@ impl Reram {
     }
 
     pub unsafe fn write_u32_aligned_dma(&mut self, _addr: usize, data: &[u32]) {
-        use xous_pl230::*;
         //assert!(addr % 0x20 == 0, "unaligned destination address!");
         //assert!(data.len() % 8 == 0, "unaligned source data!");
         let init_ptr = utralib::HW_IFRAM1_MEM as *mut u32;

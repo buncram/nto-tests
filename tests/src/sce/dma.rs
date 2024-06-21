@@ -1,5 +1,4 @@
 use utralib::generated::*;
-use utralib::utra::sysctrl;
 
 use crate::debug;
 use crate::utils::*;

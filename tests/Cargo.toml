@@ -17,7 +17,7 @@ xous-pio = { path = "../../xous-core/libs/xous-pio", default-features = false, f
     "cramium-soc",
     "baremetal",
 ] }
-xous-pl230 = { path = "../../xous-core/libs/xous-pl230", optional = true, default-features = false, features = [
+xous-pl230 = { path = "../../xous-core/libs/xous-pl230", default-features = false, features = [
     "tests",
     "cramium-soc",
     "baremetal",
@@ -27,16 +27,39 @@ pio-proc = "0.2.2"
 pio = "0.2.1"
 
 [features]
-debug-print = []
-pio-test = []
+fast-fclk = []   # 800 MHz FCLK
+sram-margin = []
+
+rram-testing = []   # used to try and help debug/bringup RRAM issues
+uart2 = []
+sce-dma = []
+pio-test = []       # full suite of PIO tests
+pio-quick-test = [] # just one quick test
 bio-test = []
 xip = []
 apb-test = []
-pl230-test = ["xous-pl230"]
+pl230-test = []
 quanta-test = []
-sram-margin = []
-rram-testing = []                    # used to try and help debug/bringup RRAM issues
-default = ["pl230-test", "bio-test"]
+
+# "standard" tests that should generally always be included
+virtual-memory = []
+irq-test = []
+satp-test = []
+caching-test = []
+ram-test = []
+wfi-test = []
+
+default = [
+    "fast-fclk",
+    "bio-test",
+    "sram-margin",
+    "virtual-memory",
+    "irq-test",
+    "satp-test",
+    "caching-test",
+    "ram-test",
+    "wfi-test",
+]
 
 [target.'cfg(not(any(windows, unix)))'.dependencies]
 utralib = { path = "../utralib" }

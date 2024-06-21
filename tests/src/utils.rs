@@ -1,9 +1,4 @@
-use core::convert::TryFrom;
-use core::convert::TryInto;
-use core::mem::size_of;
-
 use utralib::generated::*;
-use utralib::utra::sysctrl;
 
 use crate::debug;
 
@@ -60,4 +55,22 @@ pub fn lfsr_next_16(state: u16) -> u16 {
     let bit = ((state >> 3) ^ (state >> 2)) & 1;
 
     ((state << 1) + bit) & 0xF
+}
+
+pub fn reset_ticktimer() {
+    let mut tt = CSR::new(utra::ticktimer::HW_TICKTIMER_BASE as *mut u32);
+    // tt.wo(utra::ticktimer::CLOCKS_PER_TICK, 160);
+    tt.wo(utra::ticktimer::CLOCKS_PER_TICK, 369560); // based on 369.56MHz default clock
+    tt.wfo(utra::ticktimer::CONTROL_RESET, 1);
+    tt.wo(utra::ticktimer::CONTROL, 0);
+}
+
+pub fn snap_ticks(title: &str) {
+    let tt = CSR::new(utra::ticktimer::HW_TICKTIMER_BASE as *mut u32);
+    let mut uart = debug::Uart {};
+    uart.tiny_write_str(title);
+    uart.tiny_write_str(" time: ");
+    uart.print_hex_word(tt.rf(utra::ticktimer::TIME0_TIME));
+    // write!(uart, "{} time: {} ticks\n", title, elapsed).ok();
+    uart.tiny_write_str(" ticks\r");
 }

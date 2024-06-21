@@ -9,6 +9,7 @@ type DynError = Box<dyn std::error::Error>;
 const TARGET: &str = "riscv32imac-unknown-none-elf";
 
 #[derive(Debug)]
+#[allow(dead_code)]
 enum BuildError {
     #[allow(dead_code)]
     PathConversionError,
