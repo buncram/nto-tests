@@ -3,8 +3,6 @@ pub struct Uart {
     // pub base: *mut u32,
 }
 
-#[allow(dead_code)]
-#[cfg(feature = "daric")]
 pub mod duart {
     pub const UART_DOUT: utralib::Register = utralib::Register::new(0, 0xff);
     pub const UART_DOUT_DOUT: utralib::Field = utralib::Field::new(8, 0, UART_DOUT);
@@ -41,34 +39,6 @@ impl Uart {
         }
     }
 
-    #[cfg(not(feature = "daric"))]
-    pub fn putc(&self, c: u8) { self.putc_litex(c); }
-
-    pub fn putc_litex(&self, c: u8) {
-        let base = utra::uart::HW_UART_BASE as *mut u32;
-        let mut uart = CSR::new(base);
-        // Wait until TXFULL is `0`
-        while uart.r(utra::uart::TXFULL) != 0 {}
-        uart.wo(utra::uart::RXTX, c as u32)
-    }
-
-    #[cfg(not(feature = "daric"))]
-    pub fn getc(&self) -> Option<u8> { self.getc_litex() }
-
-    pub fn getc_litex(&self) -> Option<u8> {
-        let base = utra::uart::HW_UART_BASE as *mut u32;
-        let mut uart = CSR::new(base);
-        match uart.rf(utra::uart::EV_PENDING_RX) {
-            0 => None,
-            ack => {
-                let c = Some(uart.rf(utra::uart::RXTX_RXTX) as u8);
-                uart.wfo(utra::uart::EV_PENDING_RX, ack);
-                c
-            }
-        }
-    }
-
-    #[cfg(feature = "daric")]
     pub fn putc(&self, c: u8) {
         let base = duart::HW_DUART_BASE as *mut u32;
         let mut uart = CSR::new(base);
@@ -82,7 +52,6 @@ impl Uart {
         uart.wfo(duart::UART_DOUT_DOUT, c as u32);
     }
 
-    #[cfg(feature = "daric")]
     pub fn getc(&self) -> Option<u8> {
         unimplemented!();
     }

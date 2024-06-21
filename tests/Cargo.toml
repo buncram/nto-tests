@@ -49,10 +49,14 @@ caching-test = []
 ram-test = []
 wfi-test = []
 
+# flag set to turn off quirks between verilator and hardware
+verilator = []
+
 default = [
+    "verilator",
     "fast-fclk",
     "bio-test",
-    "sram-margin",
+    # "sram-margin", # this causes a hard reboot in simulation??
     "virtual-memory",
     "irq-test",
     "satp-test",

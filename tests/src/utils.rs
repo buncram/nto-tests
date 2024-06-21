@@ -4,6 +4,8 @@ use crate::debug;
 
 pub fn report_api(d: u32) {
     let mut uart = debug::Uart {};
+    let mut report = CSR::new(utra::csrtest::HW_CSRTEST_BASE as *mut u32);
+    report.wo(utra::csrtest::WTEST, d);
     uart.print_hex_word(d);
     uart.putc(0xdu8); // add a CR character
 }
