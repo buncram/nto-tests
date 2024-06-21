@@ -1,0 +1,17 @@
+[package]
+name = "utralib"
+version = "0.1.24"
+authors = ["Sean Cross <sean@xobs.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[build-dependencies]
+svd2utra = { path = "../../xous-core/svd2utra/" }
+
+[features]
+cramium-soc = []
+cramium-fpga = []
+default = []

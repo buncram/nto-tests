@@ -1,0 +1,9 @@
+*~
+target/
+.vscode/
+
+/*.sh
+/*.bin
+/*.lst
+/*.map
+
