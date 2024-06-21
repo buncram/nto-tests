@@ -59,10 +59,10 @@ fn build_hw_image(debug: bool, features: Vec<String>, packages: &[&str]) -> Resu
     boot.push("tests");
     println!("debug: boot path: {}", boot.as_os_str().to_str().unwrap());
     let mut boot_bin = project_root();
-    boot_bin.push("boot.bin");
+    boot_bin.push("rv32.bin");
 
     // dump the ELF file
-    let listing = std::fs::File::create("boot.map")?;
+    let listing = std::fs::File::create("rv32.map")?;
     let status = Command::new(objdump())
         .current_dir(project_root())
         .args(&["-d", "-S", boot.as_os_str().to_str().unwrap()])
@@ -115,6 +115,9 @@ fn build(
     let stream = if debug { "debug" } else { "release" };
     let mut args = vec!["build"];
     print!("Building");
+
+    args.push("--no-default-features");
+
     for package in packages {
         print!(" {}", package);
         args.push("--package");
@@ -143,6 +146,13 @@ fn build(
     if let Some(subdir) = &directory {
         dir.push(subdir);
     }
+
+    // emit debug
+    print!("    Command: cargo");
+    for &arg in args.iter() {
+        print!(" {}", arg);
+    }
+    println!();
 
     let status = Command::new(cargo()).current_dir(dir).args(&args).status()?;
 

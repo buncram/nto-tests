@@ -49,11 +49,10 @@ caching-test = []
 ram-test = []
 wfi-test = []
 
-# flag set to turn off quirks between verilator and hardware
-verilator = []
+# The PLL model complains about a setting that works on real hardware...?
+quirks-pll = []
 
 default = [
-    "verilator",
     "fast-fclk",
     "bio-test",
     # "sram-margin", # this causes a hard reboot in simulation??

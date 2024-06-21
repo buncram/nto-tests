@@ -83,13 +83,10 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         // do nothing
     } else {
         // PD PLL
-        #[cfg(not(feature = "verilator"))]
-        {
-            daric_cgu
-                .add(sysctrl::SFR_IPCLPEN.offset())
-                .write_volatile(daric_cgu.add(sysctrl::SFR_IPCLPEN.offset()).read_volatile() | 0x02);
-            daric_cgu.add(sysctrl::SFR_IPCARIPFLOW.offset()).write_volatile(0x32); // commit, must write 32
-        }
+        daric_cgu
+            .add(sysctrl::SFR_IPCLPEN.offset())
+            .write_volatile(daric_cgu.add(sysctrl::SFR_IPCLPEN.offset()).read_volatile() | 0x02);
+        daric_cgu.add(sysctrl::SFR_IPCARIPFLOW.offset()).write_volatile(0x32); // commit, must write 32
 
         // delay
         for _ in 0..1024 {
@@ -108,13 +105,10 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         // daric_cgu.add(sysctrl::SFR_IPCCR.offset()).write_volatile((3 << 6) | (5 << 3) | (5));
         daric_cgu.add(sysctrl::SFR_IPCARIPFLOW.offset()).write_volatile(0x32); // commit, must write 32
 
-        #[cfg(not(feature = "verilator"))]
-        {
-            daric_cgu
-                .add(sysctrl::SFR_IPCLPEN.offset())
-                .write_volatile(daric_cgu.add(sysctrl::SFR_IPCLPEN.offset()).read_volatile() & !0x02);
-            daric_cgu.add(sysctrl::SFR_IPCARIPFLOW.offset()).write_volatile(0x32); // commit, must write 32
-        }
+        daric_cgu
+            .add(sysctrl::SFR_IPCLPEN.offset())
+            .write_volatile(daric_cgu.add(sysctrl::SFR_IPCLPEN.offset()).read_volatile() & !0x02);
+        daric_cgu.add(sysctrl::SFR_IPCARIPFLOW.offset()).write_volatile(0x32); // commit, must write 32
 
         // delay
         for _ in 0..1024 {
@@ -122,49 +116,43 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         }
         // crate::println!("PLL delay 2");
 
-        #[cfg(not(feature = "verilator"))]
-        {
-            daric_cgu.add(sysctrl::SFR_CGUSEL0.offset()).write_volatile(1); // clktop sel, 0:clksys, 1:clkpll0
-            daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32); // commit
-        }
+        daric_cgu.add(sysctrl::SFR_CGUSEL0.offset()).write_volatile(1); // clktop sel, 0:clksys, 1:clkpll0
+        daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32); // commit
 
         for _ in 0..1024 {
             unsafe { core::arch::asm!("nop") };
         }
         // crate::println!("PLL delay 3");
 
-        #[cfg(not(feature = "verilator"))]
-        {
-            crate::println!("fsvalid: {}", daric_cgu.add(sysctrl::SFR_CGUFSVLD.offset()).read_volatile());
-            let _cgufsfreq0 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ0.offset()).read_volatile();
-            let _cgufsfreq1 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ1.offset()).read_volatile();
-            let _cgufsfreq2 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ2.offset()).read_volatile();
-            let _cgufsfreq3 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ3.offset()).read_volatile();
-            crate::println!(
-                "Internal osc: {} -> {} MHz ({} MHz)",
-                _cgufsfreq0,
-                fsfreq_to_hz(_cgufsfreq0),
-                fsfreq_to_hz_32(_cgufsfreq0)
-            );
-            crate::println!(
-                "XTAL: {} -> {} MHz ({} MHz)",
-                _cgufsfreq1,
-                fsfreq_to_hz(_cgufsfreq1),
-                fsfreq_to_hz_32(_cgufsfreq1)
-            );
-            crate::println!(
-                "pll output 0: {} -> {} MHz ({} MHz)",
-                _cgufsfreq2,
-                fsfreq_to_hz(_cgufsfreq2),
-                fsfreq_to_hz_32(_cgufsfreq2)
-            );
-            crate::println!(
-                "pll output 1: {} -> {} MHz ({} MHz)",
-                _cgufsfreq3,
-                fsfreq_to_hz(_cgufsfreq3),
-                fsfreq_to_hz_32(_cgufsfreq3)
-            );
-        }
+        crate::println!("fsvalid: {}", daric_cgu.add(sysctrl::SFR_CGUFSVLD.offset()).read_volatile());
+        let _cgufsfreq0 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ0.offset()).read_volatile();
+        let _cgufsfreq1 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ1.offset()).read_volatile();
+        let _cgufsfreq2 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ2.offset()).read_volatile();
+        let _cgufsfreq3 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ3.offset()).read_volatile();
+        crate::println!(
+            "Internal osc: {} -> {} MHz ({} MHz)",
+            _cgufsfreq0,
+            fsfreq_to_hz(_cgufsfreq0),
+            fsfreq_to_hz_32(_cgufsfreq0)
+        );
+        crate::println!(
+            "XTAL: {} -> {} MHz ({} MHz)",
+            _cgufsfreq1,
+            fsfreq_to_hz(_cgufsfreq1),
+            fsfreq_to_hz_32(_cgufsfreq1)
+        );
+        crate::println!(
+            "pll output 0: {} -> {} MHz ({} MHz)",
+            _cgufsfreq2,
+            fsfreq_to_hz(_cgufsfreq2),
+            fsfreq_to_hz_32(_cgufsfreq2)
+        );
+        crate::println!(
+            "pll output 1: {} -> {} MHz ({} MHz)",
+            _cgufsfreq3,
+            fsfreq_to_hz(_cgufsfreq3),
+            fsfreq_to_hz_32(_cgufsfreq3)
+        );
 
         // Hits a 16:8:4:2:1 ratio on fclk:aclk:hclk:iclk:pclk
         // Resulting in 800:400:200:100:50 MHz assuming 800MHz fclk
@@ -194,10 +182,12 @@ fn fsfreq_to_hz(fs_freq: u32) -> u32 { (fs_freq * (48_000_000 / 32)) / 1_000_000
 fn fsfreq_to_hz_32(fs_freq: u32) -> u32 { (fs_freq * (32_000_000 / 32)) / 1_000_000 }
 
 pub unsafe fn early_init() {
+    #[cfg(not(feature = "quirks-pll"))]
     {
         // This block is MANDATORY for any chip stability in real silicon, as the initial
         // clocks are too unstable to do anything otherwise.
         let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
+
         daric_cgu.add(sysctrl::SFR_CGUSEL1.offset()).write_volatile(1); // 0: RC, 1: XTAL
         daric_cgu.add(sysctrl::SFR_CGUFSCR.offset()).write_volatile(48); // external crystal is 48MHz
         daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);

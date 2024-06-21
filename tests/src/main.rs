@@ -73,8 +73,11 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     reset_ticktimer();
     snap_ticks("sysctrl: ipen ");
 
-    uart.tiny_write_str("setting clocks\r");
-    init_clock_asic(800_000_000);
+    #[cfg(not(feature = "quirks-pll"))]
+    {
+        uart.tiny_write_str("setting clocks\r");
+        init_clock_asic(800_000_000);
+    }
 
     uart.tiny_write_str("booting... 001\r");
 
@@ -118,9 +121,9 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
 
     #[cfg(feature = "bio-test")]
     {
-        print!("bio start\r");
+        crate::println!("bio start");
         xous_bio::bio_tests::bio_tests();
-        print!("bio end\r");
+        crate::println!("bio end");
     }
 
     // This also sets up exceptions for all other tests that depend on IRQs
