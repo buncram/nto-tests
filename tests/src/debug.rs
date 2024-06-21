@@ -80,17 +80,11 @@ impl Uart {
             // spin wait
         }
         uart.wfo(duart::UART_DOUT_DOUT, c as u32);
-
-        #[cfg(feature = "arty")]
-        self.putc_litex(c);
     }
 
     #[cfg(feature = "daric")]
     pub fn getc(&self) -> Option<u8> {
-        #[cfg(not(feature = "arty"))]
         unimplemented!();
-        #[cfg(feature = "arty")]
-        self.getc_litex()
     }
 
     pub fn tiny_write_str(&mut self, s: &str) {
