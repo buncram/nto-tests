@@ -6,6 +6,68 @@ use utralib::generated::*;
 
 use crate::satp;
 use crate::utils::*;
+use crate::TestRunner;
+use crate::*;
+
+const BYTE_STROBE_TESTS: usize = 1;
+crate::impl_test!(ByteStrobeTests, "Byte strobes", BYTE_STROBE_TESTS);
+impl TestRunner for ByteStrobeTests {
+    fn run(&mut self) {
+        unsafe {
+            check_byte_strobes();
+        }
+        self.passing_tests += 1;
+    }
+}
+
+const RAM_TESTS: usize = 8;
+crate::impl_test!(RamTests, "RAM", RAM_TESTS);
+impl TestRunner for RamTests {
+    fn run(&mut self) {
+        self.passing_tests += unsafe { caching_tests() };
+
+        const BASE_ADDR: u32 = satp::PT_LIMIT as u32; // don't overwrite our PT data
+        unsafe {
+            // 'random' access test
+            let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u32, 512);
+            self.passing_tests += ramtest_lfsr(&mut test_slice, 3);
+
+            // now some basic memory read/write tests
+            // entirely within cache access test
+            // 256-entry by 32-bit slice at start of RAM
+            let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u32, 256);
+            self.passing_tests += ramtest_all(&mut test_slice, 4);
+            // byte access test
+            let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u8, 256);
+            self.passing_tests += ramtest_fast(&mut test_slice, 5);
+            // word access test
+            let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u16, 512);
+            self.passing_tests += ramtest_fast(&mut test_slice, 6); // 1ff00
+
+            // outside cache test
+            // 6144-entry by 32-bit slice at start of RAM - should cross outside cache boundary
+            let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u32, 0x1800);
+            self.passing_tests += ramtest_fast(&mut test_slice, 7); // c7f600
+
+            // this passed, now that the AXI state machine is fixed.
+            let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u32, 0x1800);
+            self.passing_tests += ramtest_fast_specialcase1(&mut test_slice, 8); // c7f600
+
+            // u64 access test
+            let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u64, 0xC00);
+            self.passing_tests += ramtest_fast(&mut test_slice, 9);
+
+            // random size/access test
+            // let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u8, 0x6000);
+        }
+    }
+}
+
+const XIP_TESTS: usize = 16;
+crate::impl_test!(XipTests, "XIP", XIP_TESTS);
+impl TestRunner for XipTests {
+    fn run(&mut self) { self.passing_tests += xip_test(); }
+}
 
 pub unsafe fn check_byte_strobes() {
     let u8_test = utra::duart::HW_DUART_BASE as *mut u8;
@@ -22,7 +84,7 @@ pub unsafe fn check_byte_strobes() {
         u16_test.add(1).write_volatile(0x55);
     }
 }
-pub unsafe fn caching_tests() {
+pub unsafe fn caching_tests() -> usize {
     // test of the 0x500F cache flush instruction - this requires manual inspection of the report values
     report_api(0x000c_ac7e);
     const CACHE_WAYS: usize = 4;
@@ -68,59 +130,20 @@ pub unsafe fn caching_tests() {
     // check that caching is disabled for I/O regions
     report_api(0xc520_0000);
     let mut csrtest = CSR::new(utra::csrtest::HW_CSRTEST_BASE as *mut u32);
-    let mut passing = true;
+    let mut passing = 1;
     for i in 0..4 {
         csrtest.wfo(utra::csrtest::WTEST_WTEST, i);
         let val = csrtest.rf(utra::csrtest::RTEST_RTEST);
         report_api(val);
         if val != i + 0x1000_0000 {
-            passing = false;
+            passing = 0;
         }
     }
-    if passing {
-        report_api(0xc520_600d);
-    } else {
-        report_api(0xc520_dead);
-    }
-}
-
-pub unsafe fn ram_tests() {
-    const BASE_ADDR: u32 = satp::PT_LIMIT as u32; // don't overwrite our PT data
-    // 'random' access test
-    let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u32, 512);
-    ramtest_lfsr(&mut test_slice, 3);
-
-    // now some basic memory read/write tests
-    // entirely within cache access test
-    // 256-entry by 32-bit slice at start of RAM
-    let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u32, 256);
-    ramtest_all(&mut test_slice, 4);
-    // byte access test
-    let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u8, 256);
-    ramtest_fast(&mut test_slice, 5);
-    // word access test
-    let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u16, 512);
-    ramtest_fast(&mut test_slice, 6); // 1ff00
-
-    // outside cache test
-    // 6144-entry by 32-bit slice at start of RAM - should cross outside cache boundary
-    let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u32, 0x1800);
-    ramtest_fast(&mut test_slice, 7); // c7f600
-
-    // this passed, now that the AXI state machine is fixed.
-    let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u32, 0x1800);
-    ramtest_fast_specialcase1(&mut test_slice, 8); // c7f600
-
-    // u64 access test
-    let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u64, 0xC00);
-    ramtest_fast(&mut test_slice, 9);
-
-    // random size/access test
-    // let mut test_slice = core::slice::from_raw_parts_mut(BASE_ADDR as *mut u8, 0x6000);
+    passing
 }
 
 /// chunks through the entire bank of data
-pub unsafe fn ramtest_all<T>(test_slice: &mut [T], test_index: u32)
+pub unsafe fn ramtest_all<T>(test_slice: &mut [T], test_index: u32) -> usize
 where
     T: TryFrom<usize> + TryInto<u32> + Default + Copy,
 {
@@ -140,17 +163,19 @@ where
     if sum == checksum {
         report_api(checksum as u32);
         report_api(0x600d_0000 + test_index);
+        1
     } else {
         report_api(checksum as u32);
         report_api(sum as u32);
         report_api(0x0bad_0000 + test_index);
+        0
     }
 }
 
 /// only touches two words on each cache line
 /// this one tries to write the same word twice to two consecutive addresses
 /// this causes the valid strobe to hit twice in a row. seems to pass.
-pub unsafe fn ramtest_fast_specialcase1<T>(test_slice: &mut [T], test_index: u32)
+pub unsafe fn ramtest_fast_specialcase1<T>(test_slice: &mut [T], test_index: u32) -> usize
 where
     T: TryFrom<usize> + TryInto<u32> + Default + Copy,
 {
@@ -175,15 +200,17 @@ where
     if sum == checksum {
         report_api(checksum as u32);
         report_api(0x600d_0000 + test_index);
+        1
     } else {
         report_api(checksum as u32);
         report_api(sum as u32);
         report_api(0x0bad_0000 + test_index);
+        0
     }
 }
 
 /// only touches two words on each cache line
-pub unsafe fn ramtest_fast<T>(test_slice: &mut [T], test_index: u32)
+pub unsafe fn ramtest_fast<T>(test_slice: &mut [T], test_index: u32) -> usize
 where
     T: TryFrom<usize> + TryInto<u32> + Default + Copy,
 {
@@ -211,23 +238,25 @@ where
     if sum == checksum {
         report_api(checksum as u32);
         report_api(0x600d_0000 + test_index);
+        1
     } else {
         report_api(checksum as u32);
         report_api(sum as u32);
         report_api(0x0bad_0000 + test_index);
+        0
     }
 }
 
 /// uses an LFSR to cycle through "random" locations. The slice length
 /// should equal the (LFSR period+1), so that we guarantee that each entry
 /// is visited once.
-pub unsafe fn ramtest_lfsr<T>(test_slice: &mut [T], test_index: u32)
+pub unsafe fn ramtest_lfsr<T>(test_slice: &mut [T], test_index: u32) -> usize
 where
     T: TryFrom<usize> + TryInto<u32> + Default + Copy,
 {
     if test_slice.len() != 512 {
         report_api(0x0bad_000 + test_index + 0x0F00); // indicate a failure due to configuration
-        return;
+        return 0;
     }
     let mut state: u16 = 1;
     let mut sum: u32 = 0;
@@ -256,14 +285,17 @@ where
     if sum == checksum {
         report_api(checksum as u32);
         report_api(0x600d_0000 + test_index);
+        1
     } else {
         report_api(checksum as u32);
         report_api(sum as u32);
         report_api(0x0bad_0000 + test_index);
+        0
     }
 }
 
-pub fn xip_test() {
+pub fn xip_test() -> usize {
+    let mut passing = 0;
     report_api(0x61D0_0000);
     // a code snippet that adds 0x400 to the argument and returns
     let code = [0x4005_0513u32, 0x0000_8082u32];
@@ -280,6 +312,7 @@ pub fn xip_test() {
         report_api(test_val as u32);
         expected += 0x0400;
         assert!(expected == test_val);
+        passing += 1;
     }
 
     // prep a second region, a little bit further away to trigger a second access
@@ -299,6 +332,8 @@ pub fn xip_test() {
         report_api(test_val as u32);
         expected += 1;
         assert!(expected == test_val);
+        passing += 1;
     }
     report_api(0x61D0_600D);
+    passing
 }

@@ -2,8 +2,16 @@ use utralib::generated::*;
 
 use crate::debug;
 use crate::utils::*;
+use crate::{TestBoilerplate, TestRunner};
 
-pub fn sce_dma_tests() -> bool {
+const SCE_TESTS: usize = 2;
+crate::impl_test!(SceDmaTests, "SCE DMA", SCE_TESTS);
+impl TestRunner for SceDmaTests {
+    fn run(&mut self) { self.passing_tests += sce_dma_tests(); }
+}
+
+pub fn sce_dma_tests() -> usize {
+    let mut passing = 0;
     let mut uart = debug::Uart {};
     let mut sce_ctl_csr = CSR::new(utra::sce_glbsfr::HW_SCE_GLBSFR_BASE as *mut u32);
     sce_ctl_csr.wfo(utra::sce_glbsfr::SFR_SUBEN_CR_SUBEN, 0x1F);
@@ -118,6 +126,9 @@ pub fn sce_dma_tests() -> bool {
             errs += 1;
         }
     }
+    if errs == 0 {
+        passing += 1;
+    }
     uart.tiny_write_str("dest mismatch count (should not be 0): ");
     uart.print_hex_word(errs);
     uart.tiny_write_str("\r");
@@ -223,7 +234,6 @@ pub fn sce_dma_tests() -> bool {
         core::arch::asm!(".word 0x500F", "nop", "nop", "nop", "nop", "nop",);
     }
 
-    let mut passing = true;
     errs = 0;
     // compare a to c: these should now be identical, with enc->dec
     for (i, (src, dst)) in region_a.iter().zip(region_c.iter()).enumerate() {
@@ -235,13 +245,15 @@ pub fn sce_dma_tests() -> bool {
             uart.tiny_write_str(" s<->d ");
             uart.print_hex_word(*dst);
             uart.tiny_write_str("\r");
-            passing = false;
             errs += 1;
         }
     }
     uart.tiny_write_str("errs: ");
     uart.print_hex_word(errs);
     uart.tiny_write_str("\r");
+    if errs != 0 {
+        passing += 1;
+    }
 
     passing
 }

@@ -89,12 +89,12 @@ pub mod debug_print_hardware {
 macro_rules! println
 {
     () => ({
-        $crate::print!("\r\n")
+        $crate::print!("\r")
     });
     ($fmt:expr) => ({
-        $crate::print!(concat!($fmt, "\r\n"))
+        $crate::print!(concat!($fmt, "\r"))
     });
     ($fmt:expr, $($args:tt)+) => ({
-        $crate::print!(concat!($fmt, "\r\n"), $($args)+)
+        $crate::print!(concat!($fmt, "\r"), $($args)+)
     });
 }

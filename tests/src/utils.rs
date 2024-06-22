@@ -1,6 +1,6 @@
 use utralib::generated::*;
 
-use crate::debug;
+use crate::*;
 
 pub fn report_api(d: u32) {
     let mut uart = debug::Uart {};
@@ -67,12 +67,15 @@ pub fn reset_ticktimer() {
     tt.wo(utra::ticktimer::CONTROL, 0);
 }
 
-pub fn snap_ticks(title: &str) {
-    let tt = CSR::new(utra::ticktimer::HW_TICKTIMER_BASE as *mut u32);
-    let mut uart = debug::Uart {};
-    uart.tiny_write_str(title);
-    uart.tiny_write_str(" time: ");
-    uart.print_hex_word(tt.rf(utra::ticktimer::TIME0_TIME));
-    // write!(uart, "{} time: {} ticks\n", title, elapsed).ok();
-    uart.tiny_write_str(" ticks\r");
+const RESET_TESTS: usize = 1;
+crate::impl_test!(ResetValue, "Reset value", RESET_TESTS);
+impl TestRunner for ResetValue {
+    fn run(&mut self) {
+        let resetvalue = CSR::new(utra::resetvalue::HW_RESETVALUE_BASE as *mut u32);
+        let val = resetvalue.r(utra::resetvalue::PC);
+        report_api(val);
+        if val == 0x6000_0000 {
+            self.passing_tests += 1;
+        }
+    }
 }

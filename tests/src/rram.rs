@@ -2,11 +2,23 @@ use utralib::generated::*;
 use xous_pl230::*;
 
 use crate::utils::*;
+use crate::*;
+
+const TOTAL_TESTS: usize = 0;
+crate::impl_test!(RramTests, "RRAM", TOTAL_TESTS);
+
+impl TestRunner for RramTests {
+    fn run(&mut self) {
+        rram_tests_late();
+        self.passing_tests += 1;
+    }
+}
 
 pub fn rram_tests_early() {
     let mut rbk = [0u32; 16];
     let rram = 0x6010_0000 as *mut u32;
     let rram_ctl = 0x4000_0000 as *mut u32;
+    crate::println!("RRAM early");
     report_api(0x3e3a_1770);
     unsafe {
         // readback

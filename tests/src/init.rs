@@ -3,6 +3,13 @@ use utralib::utra::sysctrl;
 
 use crate::debug;
 use crate::utils::*;
+use crate::*;
+
+const SETUP_UART2_TESTS: usize = 0;
+crate::impl_test!(SetupUart2Tests, "Setup UART2", SETUP_UART2_TESTS);
+impl TestRunner for SetupUart2Tests {
+    fn run(&mut self) { setup_uart2(); }
+}
 
 // returns the actual per_clk
 pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {

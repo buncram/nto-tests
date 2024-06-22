@@ -1,6 +1,22 @@
 use utralib::generated::*;
 
-use crate::report_api;
+use crate::*;
+
+const SATP_TESTS: usize = 3;
+crate::impl_test!(SatpTests, "SATP", SATP_TESTS);
+impl TestRunner for SatpTests {
+    fn run(&mut self) {
+        satp_setup();
+        self.passing_tests += 1;
+
+        // this is necessary for satp_test, because we trigger a fault in satp_test
+        crate::irqs::irq_setup();
+        self.passing_tests += 1;
+
+        satp_test();
+        self.passing_tests += 1;
+    }
+}
 
 pub const PAGE_SIZE: usize = 4096;
 const WORD_SIZE: usize = core::mem::size_of::<u32>();

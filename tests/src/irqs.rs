@@ -3,6 +3,24 @@ use utralib::generated::*;
 
 use crate::*;
 
+const IRQ_TESTS: usize = 1;
+crate::impl_test!(IrqTests, "IRQ", IRQ_TESTS);
+impl TestRunner for IrqTests {
+    fn run(&mut self) {
+        irq_test();
+        self.passing_tests += 1;
+    }
+}
+
+const WFI_TESTS: usize = 1;
+crate::impl_test!(WfiTests, "WFI", WFI_TESTS);
+impl TestRunner for WfiTests {
+    fn run(&mut self) {
+        wfi_test();
+        self.passing_tests += 1;
+    }
+}
+
 #[cfg(feature = "quanta-test")]
 pub fn setup_quantum_timer() {
     let mut pio_ss = xous_pio::PioSharedState::new();

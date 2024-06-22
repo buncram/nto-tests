@@ -30,39 +30,13 @@ pio = "0.2.1"
 fast-fclk = []   # 800 MHz FCLK
 sram-margin = []
 
-rram-testing = []   # used to try and help debug/bringup RRAM issues
-uart2 = []
-sce-dma = []
-pio-test = []       # full suite of PIO tests
-pio-quick-test = [] # just one quick test
-bio-test = []
-xip = []
 apb-test = []
-pl230-test = []
 quanta-test = []
-
-# "standard" tests that should generally always be included
-virtual-memory = []
-irq-test = []
-satp-test = []
-caching-test = []
-ram-test = []
-wfi-test = []
 
 # The PLL model complains about a setting that works on real hardware...?
 quirks-pll = []
 
-default = [
-    "fast-fclk",
-    "bio-test",
-    # "sram-margin", # this causes a hard reboot in simulation??
-    "virtual-memory",
-    "irq-test",
-    "satp-test",
-    "caching-test",
-    "ram-test",
-    "wfi-test",
-]
+default = ["fast-fclk"]
 
 [target.'cfg(not(any(windows, unix)))'.dependencies]
 utralib = { path = "../utralib" }
