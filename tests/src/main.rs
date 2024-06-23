@@ -126,6 +126,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
 
     let mut tests: [&mut dyn Test; 14] = [
         &mut reset_value_test,
+        &mut rram_tests,
         &mut mbox_test,
         // at the conclusion of this, we are running in "supervisor" (kernel) mode, with Sv32 semantics
         &mut satp_tests,
@@ -134,7 +135,6 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
         &mut setup_uart2_test,
         &mut byte_strobe_tests,
         &mut ram_tests,
-        &mut rram_tests,
         &mut pio_quick_tests,
         &mut xip_tests,
         &mut sce_dma_tests,

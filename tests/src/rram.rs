@@ -4,59 +4,32 @@ use xous_pl230::*;
 use crate::utils::*;
 use crate::*;
 
-const TOTAL_TESTS: usize = 0;
+const TOTAL_TESTS: usize = 8;
 crate::impl_test!(RramTests, "RRAM", TOTAL_TESTS);
 
 impl TestRunner for RramTests {
-    fn run(&mut self) {
-        rram_tests_late();
-        self.passing_tests += 1;
-    }
+    fn run(&mut self) { self.passing_tests += rram_tests_early(); }
 }
 
-pub fn rram_tests_early() {
-    let mut rbk = [0u32; 16];
-    let rram = 0x6010_0000 as *mut u32;
-    let rram_ctl = 0x4000_0000 as *mut u32;
-    crate::println!("RRAM early");
-    report_api(0x3e3a_1770);
-    unsafe {
-        // readback
-        for (i, r) in rbk.iter_mut().enumerate() {
-            *r = rram.add(i).read_volatile();
-        }
-        for &r in rbk.iter() {
-            report_api(r);
-        }
-
-        // this writes bytes in linear order
-        // rram.add(0).write_volatile(0x1234_1234);
-        // rram.add(1).write_volatile(0xfeed_face);
-        // rram.add(2).write_volatile(0x3141_5926);
-        // rram.add(3).write_volatile(0x1111_1111);
-        // rram.add(4).write_volatile(0xc0de_f00d);
-        // rram.add(5).write_volatile(0xace0_bace);
-        // rram.add(6).write_volatile(0x600d_c0de);
-        // rram.add(7).write_volatile(0x2222_2222);
-
-        // this was an attempt to reverse/swap byte writing orders to
-        // see how this impacts the RRAM receiver
-        rram.add(1).write_volatile(0x2222_2222);
-        rram.add(0).write_volatile(0x1111_1111);
-        rram.add(2).write_volatile(0x3333_3333);
-        rram.add(3).write_volatile(0x4444_4444);
-        rram.add(4).write_volatile(0x5555_5555);
-        rram.add(5).write_volatile(0x6666_6666);
-        rram.add(7).write_volatile(0x8888_8888);
-        rram.add(6).write_volatile(0x7777_7777);
-        rram_ctl.add(0).write_volatile(2);
-        rram.add(0).write_volatile(0x5200);
-        rram.add(0).write_volatile(0x9528);
-        rram_ctl.add(0).write_volatile(0);
-    }
-    report_api(0x3e3a_1771); // make some delay while RRAM processes
+pub fn rram_tests_early() -> usize {
     let mut reram = Reram::new();
-    let test_data: [u32; 8] = [
+    let mut rbk = [0u32; TOTAL_TESTS];
+    let byte_offset = 0x10_0000;
+    // readback
+    {
+        let rslice = &reram.read_slice()[byte_offset / core::mem::size_of::<u32>()
+            ..byte_offset / core::mem::size_of::<u32>() + rbk.len()];
+        rbk.copy_from_slice(rslice);
+    }
+    /*
+    for (i, &r) in rbk.iter().enumerate() {
+        crate::println!("{}: {:x}", i, r);
+    }
+    */
+    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+
+    crate::println!("RRAM writing...");
+    let test_data: [u32; TOTAL_TESTS] = [
         0xeeee_eeee,
         0xbabe_600d,
         0x3141_5926,
@@ -66,26 +39,40 @@ pub fn rram_tests_early() {
         0x600d_c0de,
         0x1010_1010,
     ];
-    unsafe {
-        reram.write_u32_aligned_dma(8, &test_data);
-        rram_ctl.add(0).write_volatile(2);
-        rram.add(0).write_volatile(0x5200);
-        rram.add(0).write_volatile(0x9528);
-        rram_ctl.add(0).write_volatile(0);
 
-        core::arch::asm!(".word 0x500F",);
-        report_api(0x3e3a_1772); // make some delay while RRAM processes
-        // readback
-        for (i, r) in rbk.iter_mut().enumerate() {
-            *r = rram.add(i).read_volatile();
-        }
-        for (i, &r) in rbk.iter().enumerate() {
-            if i == 8 {
-                report_api(0x3e3a_1773);
+    unsafe {
+        reram.write_u32_aligned(byte_offset, &test_data);
+    }
+    unsafe {
+        // cache flush
+        #[rustfmt::skip]
+        core::arch::asm!(
+            ".word 0x500F",
+            "nop",
+            "nop",
+            "nop",
+            "nop",
+            "fence",
+            "nop",
+            "nop",
+            "nop",
+            "nop",
+        );
+    }
+    let mut passing = 0;
+    {
+        let rslice = &reram.read_slice()[byte_offset / core::mem::size_of::<u32>()
+            ..byte_offset / core::mem::size_of::<u32>() + rbk.len()];
+        for (i, (&s, &d)) in test_data.iter().zip(rslice.iter()).enumerate() {
+            if s != d {
+                crate::println!("@{}: w {:x} -> r {:x}", i, s, d);
+            } else {
+                passing += 1;
             }
-            report_api(r);
         }
-    };
+    }
+    crate::println!("Passing {} of {}", passing, TOTAL_TESTS);
+    passing
 }
 
 pub fn rram_tests_late() {
@@ -175,25 +162,38 @@ impl Reram {
         }
     }
 
+    pub fn read_slice(&self) -> &[u32] { self.array }
+
     /// This is a crappy "unsafe" initial version that requires the write
     /// destination address to be aligned to a 256-bit boundary, and the data
     /// to be exactly 256 bits long.
     pub unsafe fn write_u32_aligned(&mut self, addr: usize, data: &[u32]) {
         assert!(addr % 0x20 == 0, "unaligned destination address!");
         assert!(data.len() % 8 == 0, "unaligned source data!");
-        for d in data.chunks_exact(8) {
+        for (outer, d) in data.chunks_exact(8).enumerate() {
             // write the data to the buffer
-            for (&src, dst) in d.iter().zip(
-                self.array[addr / core::mem::size_of::<u32>()..addr / core::mem::size_of::<u32>() + 8]
-                    .iter_mut(),
-            ) {
-                *dst = src;
+            for (inner, &datum) in d.iter().enumerate() {
+                self.array
+                    .as_mut_ptr()
+                    .add(addr / core::mem::size_of::<u32>() + outer * 8 + inner)
+                    .write_volatile(datum);
+                core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
             }
+
             self.csr.wo(rrc::RRC_CR, rrc::RRC_CR_WRITE_CMD);
-            self.array[addr / core::mem::size_of::<u32>()] = rrc::RRC_LOAD_BUFFER;
-            self.array[addr / core::mem::size_of::<u32>()] = rrc::RRC_WRITE_BUFFER;
+            self.array
+                .as_mut_ptr()
+                .add(addr / core::mem::size_of::<u32>() + outer * 8)
+                .write_volatile(rrc::RRC_LOAD_BUFFER);
+            core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+            self.array
+                .as_mut_ptr()
+                .add(addr / core::mem::size_of::<u32>() + outer * 8)
+                .write_volatile(rrc::RRC_WRITE_BUFFER);
+            core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
             self.csr.wo(rrc::RRC_CR, rrc::RRC_CR_NORMAL);
         }
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
     }
 
     pub unsafe fn write_u32_aligned_dma(&mut self, _addr: usize, data: &[u32]) {
