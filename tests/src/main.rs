@@ -8,6 +8,7 @@ mod bio;
 mod debug;
 mod init;
 mod irqs;
+mod mbox;
 mod pio;
 mod pl230;
 mod ramtests;
@@ -108,6 +109,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     reset_ticktimer();
 
     let mut reset_value_test = utils::ResetValue::new(true);
+    let mut mbox_test = mbox::MboxTests::new(true);
     let mut satp_tests = satp::SatpTests::new(true);
     let mut irq_tests = irqs::IrqTests::new(true);
     let mut wfi_tests = irqs::WfiTests::new(true);
@@ -122,8 +124,9 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut bio_tests = bio::BioTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut tests: [&mut dyn Test; 13] = [
+    let mut tests: [&mut dyn Test; 14] = [
         &mut reset_value_test,
+        &mut mbox_test,
         // at the conclusion of this, we are running in "supervisor" (kernel) mode, with Sv32 semantics
         &mut satp_tests,
         &mut irq_tests,
