@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 utralib = { path = "../utralib" }
 riscv = { version = "0.5.6", package = "xous-riscv" }
-xous-bio = { path = "../../xous-core/libs/xous-bio", default-features = false, features = [
+xous-bio-bdma = { path = "../../xous-core/libs/xous-bio-bdma", default-features = false, features = [
     "tests",
     "cramium-soc",
     "baremetal",

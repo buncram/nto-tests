@@ -110,6 +110,8 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     reset_ticktimer();
 
     let mut reset_value_test = utils::ResetValue::new(true);
+    let mut bio_tests = bio::BioTests::new(true);
+
     let mut satp_setup = satp::SatpSetup::new(true);
     let mut irq_setup = irqs::IrqSetup::new(true);
     let mut satp_tests = satp::SatpTests::new(true);
@@ -118,19 +120,21 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut ram_tests = ramtests::RamTests::new(true);
     let mut timer0_tests = timer0::Timer0Tests::new(true);
 
-    let mut mbox_test = mbox::MboxTests::new(true);
-    let mut rram_tests = rram::RramTests::new(true);
+    let mut mbox_test = mbox::MboxTests::new(false);
+    let mut rram_tests = rram::RramTests::new(false);
 
     let mut setup_uart2_test = init::SetupUart2Tests::new(false);
     let mut pio_quick_tests = pio::PioQuickTests::new(false);
     let mut byte_strobe_tests = ramtests::ByteStrobeTests::new(false);
     let mut xip_tests = ramtests::XipTests::new(false);
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
-    let mut bio_tests = bio::BioTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
     let mut tests: [&mut dyn Test; 17] = [
         &mut reset_value_test,
+        // quick tests
+        &mut bio_tests,
+        // tests that can only be run on the full chip
         &mut rram_tests,
         &mut mbox_test,
         // core function setup
@@ -143,14 +147,13 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
         &mut timer0_tests,
         &mut wfi_tests,
         // irq + satp dependent tests
+        &mut pl230_tests,
         &mut setup_uart2_test,
         &mut byte_strobe_tests,
         &mut ram_tests,
         &mut pio_quick_tests,
         &mut xip_tests,
         &mut sce_dma_tests,
-        &mut bio_tests,
-        &mut pl230_tests,
     ];
 
     #[cfg(feature = "apb-test")]
