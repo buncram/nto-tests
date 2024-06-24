@@ -1,4 +1,4 @@
-use riscv::register::{scause, sepc, sie, stval, vexriscv::sim, vexriscv::sip};
+use riscv::register::{scause, sie, vexriscv::sim, vexriscv::sip};
 use utralib::generated::*;
 
 use crate::*;
@@ -17,6 +17,15 @@ crate::impl_test!(WfiTests, "WFI", WFI_TESTS);
 impl TestRunner for WfiTests {
     fn run(&mut self) {
         wfi_test();
+        self.passing_tests += 1;
+    }
+}
+
+const IRQ_SETUP_TESTS: usize = 1;
+crate::impl_test!(IrqSetup, "IRQ Setup", IRQ_SETUP_TESTS);
+impl TestRunner for IrqSetup {
+    fn run(&mut self) {
+        irq_setup();
         self.passing_tests += 1;
     }
 }
@@ -85,6 +94,8 @@ pub fn irq_setup() {
     enable_irq(utra::irqarray19::IRQARRAY19_IRQ);
     // for wfi testing
     enable_irq(utra::ticktimer::TICKTIMER_IRQ);
+    // for timer0 testing
+    enable_irq(utra::timer0::TIMER0_IRQ);
 
     // must enable external interrupts on the CPU for any of the above to matter
     unsafe { sie::set_sext() };
@@ -132,7 +143,7 @@ pub fn wfi_test() {
 pub unsafe extern "C" fn _start_trap() -> ! {
     loop {
         // install a NOP sled before _start_trap() until https://github.com/rust-lang/rust/issues/82232 is stable
-        core::arch::asm!("nop", "nop",);
+        core::arch::asm!("nop", "nop", "nop", "nop");
         #[export_name = "_start_trap_aligned"]
         pub unsafe extern "C" fn _start_trap_aligned() {
             #[rustfmt::skip]
@@ -194,7 +205,7 @@ pub unsafe extern "C" fn _start_trap() -> ! {
             );
         }
         _start_trap_aligned();
-        core::arch::asm!("nop", "nop",);
+        core::arch::asm!("nop", "nop", "nop", "nop");
     }
 }
 
@@ -258,9 +269,11 @@ pub extern "C" fn trap_handler(
     _a7: usize,
 ) -> ! {
     let mut main = CSR::new(utra::main::HW_MAIN_BASE as *mut u32);
+    #[cfg(feature = "debug-irq")]
     report_api(0x2dcd_0000);
 
     let sc: scause::Scause = scause::read();
+    #[cfg(feature = "debug-irq")]
     report_api(sc.bits() as u32);
     // 2 is illegal instruction
     if sc.bits() == 2 {
@@ -276,6 +289,7 @@ pub extern "C" fn trap_handler(
     } else if sc.bits() == 0x8000_0009 {
         // external interrupt. find out which ones triggered it, and clear the source.
         let irqs_pending = sip::read();
+        #[cfg(feature = "debug-irq")]
         report_api(irqs_pending as u32);
         if (irqs_pending & (1 << 18)) != 0 {
             let mut irqarray18 = CSR::new(utra::irqarray18::HW_IRQARRAY18_BASE as *mut u32);
@@ -307,12 +321,20 @@ pub extern "C" fn trap_handler(
             tt.wfo(utra::ticktimer::EV_PENDING_ALARM, 1); // clear the interrupt
             tt.wfo(utra::ticktimer::EV_ENABLE_ALARM, 0); // mask out the wakeup alarm
         }
+        if (irqs_pending & (1 << utra::timer0::TIMER0_IRQ)) != 0 {
+            let mut timer0 = CSR::new(utra::timer0::HW_TIMER0_BASE as *mut u32);
+            timer0.wfo(utra::timer0::EV_PENDING_ZERO, 1);
+            timer0.wo(utra::timer0::RELOAD, 10_000);
+        }
     }
 
     // report interrupt status
-    report_api(sepc::read() as u32);
-    report_api(stval::read() as u32);
-    report_api(sim::read() as u32);
+    #[cfg(feature = "debug-irq")]
+    {
+        report_api(riscv::register::sepc::read() as u32);
+        report_api(riscv::register::stval::read() as u32);
+        report_api(sim::read() as u32);
+    }
 
     // re-enable interrupts
     let status: u32;
@@ -327,9 +349,11 @@ pub extern "C" fn trap_handler(
         );
     }
     unsafe { sie::set_sext() };
+    // for some reason, this report print is important for proper function.
     report_api(status);
 
     // drop us back to user mode
+    #[cfg(feature = "debug-irq")]
     report_api(0x2dcd_600d);
     unsafe { _resume_context(crate::satp::SCRATCH_PAGE as u32) };
 }

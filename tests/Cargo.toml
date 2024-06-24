@@ -29,6 +29,7 @@ pio = "0.2.1"
 [features]
 fast-fclk = []   # 800 MHz FCLK
 sram-margin = []
+debug-irq = []
 
 apb-test = []
 quanta-test = []

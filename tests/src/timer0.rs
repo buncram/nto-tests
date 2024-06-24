@@ -2,7 +2,7 @@ use utralib::generated::*;
 
 use crate::*;
 
-const TIMER0_TESTS: usize = 1;
+const TIMER0_TESTS: usize = 2;
 crate::impl_test!(Timer0Tests, "Timer0", TIMER0_TESTS);
 impl TestRunner for Timer0Tests {
     /// Note: this implementation is dependent upon the `irq` module!

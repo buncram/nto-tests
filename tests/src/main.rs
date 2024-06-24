@@ -15,6 +15,7 @@ mod ramtests;
 mod rram;
 mod satp;
 mod sce;
+mod timer0;
 mod utils;
 
 mod asm;
@@ -109,12 +110,16 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     reset_ticktimer();
 
     let mut reset_value_test = utils::ResetValue::new(true);
-    let mut mbox_test = mbox::MboxTests::new(true);
+    let mut satp_setup = satp::SatpSetup::new(true);
+    let mut irq_setup = irqs::IrqSetup::new(true);
     let mut satp_tests = satp::SatpTests::new(true);
     let mut irq_tests = irqs::IrqTests::new(true);
     let mut wfi_tests = irqs::WfiTests::new(true);
-    let mut rram_tests = rram::RramTests::new(true);
     let mut ram_tests = ramtests::RamTests::new(true);
+    let mut timer0_tests = timer0::Timer0Tests::new(true);
+
+    let mut mbox_test = mbox::MboxTests::new(true);
+    let mut rram_tests = rram::RramTests::new(true);
 
     let mut setup_uart2_test = init::SetupUart2Tests::new(false);
     let mut pio_quick_tests = pio::PioQuickTests::new(false);
@@ -124,14 +129,20 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut bio_tests = bio::BioTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut tests: [&mut dyn Test; 14] = [
+    let mut tests: [&mut dyn Test; 17] = [
         &mut reset_value_test,
         &mut rram_tests,
         &mut mbox_test,
-        // at the conclusion of this, we are running in "supervisor" (kernel) mode, with Sv32 semantics
-        &mut satp_tests,
+        // core function setup
+        &mut satp_setup,
+        &mut irq_setup,
+        // test core function
+        &mut satp_tests, // this relies on irq setup, so it can't be run right after satp setup
         &mut irq_tests,
+        // irq-dependent tests
+        &mut timer0_tests,
         &mut wfi_tests,
+        // irq + satp dependent tests
         &mut setup_uart2_test,
         &mut byte_strobe_tests,
         &mut ram_tests,

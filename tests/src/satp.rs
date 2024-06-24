@@ -2,18 +2,20 @@ use utralib::generated::*;
 
 use crate::*;
 
-const SATP_TESTS: usize = 3;
+const SATP_TESTS: usize = 1;
 crate::impl_test!(SatpTests, "SATP", SATP_TESTS);
 impl TestRunner for SatpTests {
     fn run(&mut self) {
-        satp_setup();
-        self.passing_tests += 1;
-
-        // this is necessary for satp_test, because we trigger a fault in satp_test
-        crate::irqs::irq_setup();
-        self.passing_tests += 1;
-
+        // This relies on both SATP and IRQs being setup
         satp_test();
+        self.passing_tests += 1;
+    }
+}
+const SATP_SETUP: usize = 1;
+crate::impl_test!(SatpSetup, "SATP Setup", SATP_SETUP);
+impl TestRunner for SatpSetup {
+    fn run(&mut self) {
+        satp_setup();
         self.passing_tests += 1;
     }
 }
