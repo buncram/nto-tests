@@ -14,6 +14,8 @@ impl TestRunner for BioTests {
             crate::println!("Error: ID mem size does not match: {} != {}", id >> 16, BIO_PRIVATE_MEM_LEN);
         }
 
+        self.passing_tests += bio_tests::arith::stack_test();
+
         self.passing_tests += bio_tests::units::hello_world();
         self.passing_tests += bio_tests::units::hello_multiverse();
         self.passing_tests += bio_tests::units::aclk_tests();
