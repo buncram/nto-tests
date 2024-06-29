@@ -2,7 +2,7 @@ use xous_bio_bdma::*;
 
 use crate::*;
 
-const BIO_TESTS: usize = 10;
+const BIO_TESTS: usize = 12;
 crate::impl_test!(BioTests, "BIO", BIO_TESTS);
 impl TestRunner for BioTests {
     fn run(&mut self) {
@@ -13,6 +13,10 @@ impl TestRunner for BioTests {
         } else {
             crate::println!("Error: ID mem size does not match: {} != {}", id >> 16, BIO_PRIVATE_MEM_LEN);
         }
+
+        self.passing_tests += bio_tests::dma::dma_basic();
+        self.passing_tests += bio_tests::dma::dma_multicore();
+        self.passing_tests += bio_tests::dma::dma_coincident();
 
         self.passing_tests += bio_tests::arith::stack_test();
 
