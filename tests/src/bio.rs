@@ -22,6 +22,10 @@ const BIO_TESTS: usize =
     // complex_i2c_test
     + 1
     // fifo_level_tests
+    + 1
+    // fifo_alias_tests
+    + 1
+    // event_aliases
     + 1;
 crate::impl_test!(BioTests, "BIO", BIO_TESTS);
 impl TestRunner for BioTests {
@@ -33,6 +37,8 @@ impl TestRunner for BioTests {
         } else {
             crate::println!("Error: ID mem size does not match: {} != {}", id >> 16, BIO_PRIVATE_MEM_LEN);
         }
+        self.passing_tests += bio_tests::units::event_aliases();
+        self.passing_tests += bio_tests::units::fifo_alias_tests();
 
         self.passing_tests += bio_tests::dma::dma_basic(); // 4
         self.passing_tests += bio_tests::dma::dma_bytes(); // 4
