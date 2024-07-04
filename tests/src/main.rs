@@ -195,6 +195,12 @@ mod panic_handler {
         } else {
             uart.tiny_write_str("unspecified panic!\n\r");
         }
+        // exit the simulation
+        let mut test_cfg = utralib::CSR::new(utralib::utra::csrtest::HW_CSRTEST_BASE as *mut u32);
+        test_cfg.wo(utralib::utra::csrtest::WTEST, 0xc0ded02e);
+        test_cfg.wo(utralib::utra::csrtest::WTEST, 0xc0de600d);
+        let mut report = utralib::CSR::new(utralib::utra::main::HW_MAIN_BASE as *mut u32);
+        report.wfo(utralib::utra::main::DONE_DONE, 1);
         loop {}
     }
 }

@@ -39,6 +39,15 @@ impl TestRunner for BioTests {
         } else {
             crate::println!("Error: ID mem size does not match: {} != {}", id >> 16, BIO_PRIVATE_MEM_LEN);
         }
+
+        // map the BIO ports to GPIO pins
+        let mut iox = cramium_hal::iox::Iox::new(utra::iox::HW_IOX_BASE as *mut u32);
+        iox.set_ports_from_pio_bitmask(0xFFFF_FFFF);
+        iox.set_gpio_pullup(cramium_hal::iox::IoxPort::PB, 2, cramium_hal::iox::IoxEnable::Enable);
+        iox.set_gpio_pullup(cramium_hal::iox::IoxPort::PB, 3, cramium_hal::iox::IoxEnable::Enable);
+
+        self.passing_tests += bio_tests::units::hello_world();
+
         self.passing_tests += bio_tests::dma::dmareq_test();
         self.passing_tests += bio_tests::units::event_aliases();
         self.passing_tests += bio_tests::units::fifo_alias_tests();
@@ -51,7 +60,6 @@ impl TestRunner for BioTests {
 
         self.passing_tests += bio_tests::arith::stack_test();
 
-        self.passing_tests += bio_tests::units::hello_world();
         self.passing_tests += bio_tests::units::hello_multiverse();
         self.passing_tests += bio_tests::units::aclk_tests();
         self.passing_tests += bio_tests::units::fifo_basic();
@@ -64,5 +72,10 @@ impl TestRunner for BioTests {
 
         // note: this test runs without any cores, as all FIFO levels can be tested from the host directly
         self.passing_tests += bio_tests::units::fifo_level_tests();
+
+        // this sequence triggers an end of simulation on s32
+        let mut test_cfg = CSR::new(utra::csrtest::HW_CSRTEST_BASE as *mut u32);
+        test_cfg.wo(utra::csrtest::WTEST, 0xc0ded02e);
+        test_cfg.wo(utra::csrtest::WTEST, 0xc0de600d);
     }
 }
