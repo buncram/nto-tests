@@ -6,7 +6,7 @@ const BIO_TESTS: usize =
     // get_id
     1
     // dma
-    + 4 * 4 + 1
+    + 4 * 5 + 1
     // stack test
     + 1
     // hello word, hello multiverse, aclk_tests
@@ -52,7 +52,8 @@ impl TestRunner for BioTests {
         self.passing_tests += bio_tests::units::event_aliases();
         self.passing_tests += bio_tests::units::fifo_alias_tests();
 
-        self.passing_tests += bio_tests::dma::dma_basic(); // 4
+        self.passing_tests += bio_tests::dma::dma_basic(false); // 4
+        self.passing_tests += bio_tests::dma::dma_basic(true); // 4
         self.passing_tests += bio_tests::dma::dma_bytes(); // 4
         self.passing_tests += bio_tests::dma::dma_u16(); // 4
         self.passing_tests += bio_tests::dma::dma_multicore(); // 1
@@ -72,10 +73,5 @@ impl TestRunner for BioTests {
 
         // note: this test runs without any cores, as all FIFO levels can be tested from the host directly
         self.passing_tests += bio_tests::units::fifo_level_tests();
-
-        // this sequence triggers an end of simulation on s32
-        let mut test_cfg = CSR::new(utra::csrtest::HW_CSRTEST_BASE as *mut u32);
-        test_cfg.wo(utra::csrtest::WTEST, 0xc0ded02e);
-        test_cfg.wo(utra::csrtest::WTEST, 0xc0de600d);
     }
 }

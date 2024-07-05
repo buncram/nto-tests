@@ -25,6 +25,10 @@ xous-pl230 = { path = "../../xous-core/libs/xous-pl230", default-features = fals
 cramium-hal = { path = "../../xous-core/libs/cramium-hal" }
 pio-proc = "0.2.2"
 pio = "0.2.1"
+# Used by AES tests
+cipher = "0.4.2"
+zeroize = { version = "1.6.0", optional = true, default-features = false }
+hex-literal = "0.3.1"
 
 [features]
 fast-fclk = []   # 800 MHz FCLK

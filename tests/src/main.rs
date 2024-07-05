@@ -4,6 +4,7 @@
 
 use utralib::generated::*;
 
+mod aes;
 mod bio;
 mod debug;
 mod init;
@@ -111,7 +112,6 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
 
     let mut reset_value_test = utils::ResetValue::new(true);
     let mut bio_tests = bio::BioTests::new(true);
-
     let mut satp_setup = satp::SatpSetup::new(true);
     let mut irq_setup = irqs::IrqSetup::new(true);
     let mut satp_tests = satp::SatpTests::new(true);
@@ -119,6 +119,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut wfi_tests = irqs::WfiTests::new(true);
     let mut ram_tests = ramtests::RamTests::new(true);
     let mut timer0_tests = timer0::Timer0Tests::new(true);
+    let mut aes_tests = aes::AesTests::new(true);
 
     let mut mbox_test = mbox::MboxTests::new(false);
     let mut rram_tests = rram::RramTests::new(false);
@@ -130,9 +131,10 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut tests: [&mut dyn Test; 17] = [
+    let mut tests: [&mut dyn Test; 18] = [
         &mut reset_value_test,
         // quick tests
+        &mut aes_tests,
         &mut bio_tests,
         // tests that can only be run on the full chip
         &mut rram_tests,
@@ -173,10 +175,15 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
         }
     }
 
+    println!("Tests done.");
     // this triggers the simulation to end using a sim-only verilog hook
     let mut report = CSR::new(utra::main::HW_MAIN_BASE as *mut u32);
     report.wfo(utra::main::DONE_DONE, 1);
-    println!("Tests done.");
+    // this sequence triggers an end of simulation on s32
+    let mut test_cfg = CSR::new(utra::csrtest::HW_CSRTEST_BASE as *mut u32);
+    test_cfg.wo(utra::csrtest::WTEST, 0xc0ded02e);
+    test_cfg.wo(utra::csrtest::WTEST, 0xc0de600d);
+
     loop {}
 }
 
