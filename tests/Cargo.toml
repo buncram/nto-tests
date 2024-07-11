@@ -40,8 +40,9 @@ quanta-test = []
 
 # The PLL model complains about a setting that works on real hardware...?
 quirks-pll = []
+aes-zkn = []
 
-default = ["fast-fclk"]
+default = ["fast-fclk", "aes-zkn"]
 
 [target.'cfg(not(any(windows, unix)))'.dependencies]
 utralib = { path = "../utralib" }

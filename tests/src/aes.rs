@@ -45,6 +45,15 @@ crate::impl_test!(AesTests, "AES", AES_TESTS);
 
 use hex_literal::hex;
 
+fn u8_to_hex_ascii(byte: u8) -> [u8; 2] {
+    const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
+
+    let high_nibble = (byte >> 4) & 0x0F;
+    let low_nibble = byte & 0x0F;
+
+    [HEX_DIGITS[high_nibble as usize], HEX_DIGITS[low_nibble as usize]]
+}
+
 struct AesEcbTest<'a> {
     key: &'a [u8],
     plaintext: &'a [u8],
@@ -61,6 +70,9 @@ impl<'a> AesEcbTest<'a> {
 
         let mut output = GenericArray::clone_from_slice(self.plaintext);
         aes.encrypt_block(&mut output);
+        print!("Enc: {:x?}\r", &output.as_slice()[..4]);
+        let hex_enc = u8_to_hex_ascii(output.as_slice()[0]);
+        let hex_check = u8_to_hex_ascii(self.ciphertext[0]);
         if self.ciphertext.len() != output.len() {
             Err("encrypt error: ciphertext and output lengths do not match")?;
         }
@@ -71,9 +83,15 @@ impl<'a> AesEcbTest<'a> {
             print!("Result:    {:x?}\r", output);
             Err("encrypt error: ciphertext and output values do not match")?;
         }
+        if !((hex_enc[0] == hex_check[0]) && (hex_enc[1] == hex_check[1])) {
+            print!("Possible X-prop issue: {:x?} -> {:x?}\r", hex_enc, hex_check);
+            // in practice, this leads to the machine hanging because of X-prop into PC
+            Err("x-prop issue: encoded version of result does not match")?;
+        }
 
         // print!("Running decryption\r");
         aes.decrypt_block(&mut output);
+        print!("Dec: {:x?}\r", &output.as_slice()[..4]);
         if self.plaintext.len() != output.len() {
             Err("decrypt error: plaintext and output lengths do not match")?;
         }
@@ -90,6 +108,12 @@ impl<'a> AesEcbTest<'a> {
 impl TestRunner for AesTests {
     fn run(&mut self) {
         let mut failures = 0;
+        #[cfg(feature = "aes-zkn")]
+        let aes_style = "AES ZKN";
+        #[cfg(not(feature = "aes-zkn"))]
+        let aes_style = "AES VexRV";
+
+        print!("AES {} extensions\r", aes_style);
         for (i, test) in TESTS.iter().enumerate() {
             print!("AES #{}\r", i);
             if let Err(e) = test.test() {
@@ -99,15 +123,409 @@ impl TestRunner for AesTests {
                 self.passing_tests += 1;
             }
         }
-        print!("{} tests were run and {} errors were encountered\r", TESTS.len(), failures);
+        print!("AES {} extensions: {} tests were run with {} errors\r", aes_style, TESTS.len(), failures);
+
+        /*
+        print!("AES Zkn extensions\r");
+        #[rustfmt::skip]
+        unsafe {
+            core::arch::asm!(
+                "aes32esi t0, a0, a1, 0"
+            )
+        };
+        */
     }
+}
+
+// alternate key schedule
+
+/// AES Forward SBox
+const E_SBOX: [u8; 256] = [
+    0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76, 0xca,
+    0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0, 0xb7, 0xfd,
+    0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15, 0x04, 0xc7, 0x23,
+    0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75, 0x09, 0x83, 0x2c, 0x1a,
+    0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84, 0x53, 0xd1, 0x00, 0xed, 0x20,
+    0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf, 0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d,
+    0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8, 0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38,
+    0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2, 0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17,
+    0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73, 0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46,
+    0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb, 0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3,
+    0xac, 0x62, 0x91, 0x95, 0xe4, 0x79, 0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4,
+    0xea, 0x65, 0x7a, 0xae, 0x08, 0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f,
+    0x4b, 0xbd, 0x8b, 0x8a, 0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86,
+    0xc1, 0x1d, 0x9e, 0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55,
+    0x28, 0xdf, 0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb,
+    0x16,
+];
+
+/// Apply the AES forward SBox to each byte in a 32-bit word.
+#[allow(dead_code)]
+fn aes_sub_word(inw: u32) -> u32 {
+    let t0 = (E_SBOX[(inw as usize >> 0) & 0xFF] as u32) << 0;
+    let t1 = (E_SBOX[(inw as usize >> 8) & 0xFF] as u32) << 8;
+    let t2 = (E_SBOX[(inw as usize >> 16) & 0xFF] as u32) << 16;
+    let t3 = (E_SBOX[(inw as usize >> 24) & 0xFF] as u32) << 24;
+
+    return t3 | t2 | t1 | t0;
+}
+
+// #define AES_256_NB          4
+// #define AES_256_NK          8
+// #define AES_256_NR          14
+#[inline(always)]
+#[allow(dead_code)]
+fn rotr32(x: u32, c: u32) -> u32 { ((x) >> (c)) | ((x) << (32 - (c))) }
+#[inline(always)]
+#[allow(dead_code)]
+fn rotl32(x: u32, c: u32) -> u32 { ((x) << (c)) | ((x) >> (32 - (c))) }
+const ROUND_CONST: [u8; 11] = [0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36];
+
+#[allow(dead_code)]
+fn aes_key_schedule_256_alt(ck: &[u8]) -> VexKeys256 {
+    assert!(ck.len() == 32);
+    let mut rk_u32 = [0u32; 60];
+    for (rk, ck4) in rk_u32.iter_mut().zip(ck.chunks(core::mem::size_of::<u32>())) {
+        *rk = u32::from_le_bytes(ck4.try_into().unwrap());
+    }
+
+    let mut temp = rk_u32[ck.len() / core::mem::size_of::<u32>() - 1];
+    // unsafe alias of the round keys to break interior mutability problem in the construction
+    // of this loop. We are doing it this way because we want a direct copy of a C-style key scheduler
+    // to cross-validate that the AES instructions are compatible with some C reference code, so
+    // we prefer to use an unsafe alias rather than re-structuring the core loop to please Rust's
+    // borrow checker.
+    let rk_u32_unsafe_alias = unsafe { core::slice::from_raw_parts(rk_u32.as_ptr(), rk_u32.len()) };
+    for (i, (rk, rk_prev)) in rk_u32[ck.len() / core::mem::size_of::<u32>()..]
+        .iter_mut()
+        .zip(rk_u32_unsafe_alias.iter())
+        .enumerate()
+    {
+        let j = i + 8;
+        if j % 8 == 0 {
+            temp = rotr32(temp, 8);
+            temp = aes_sub_word(temp);
+            temp ^= ROUND_CONST[j / 8] as u32;
+        } else if (j % 8) == 4 {
+            temp = aes_sub_word(temp);
+        }
+        *rk = *rk_prev ^ temp;
+        temp = *rk;
+    }
+    /*
+    for (i, rk) in rk_u32.iter().enumerate() {
+        print!("rk{}: {:08x}\r", i, rk);
+    }
+    */
+    rk_u32
+}
+
+fn aes_key_schedule_256_even_moar_alt_wrapper(ck: &[u8]) -> VexKeys256 {
+    // Safety: safe because our target has the "zkn" RV32 extensions.
+    unsafe { aes_key_schedule_256_even_moar_alt(ck) }
+}
+
+#[target_feature(enable = "zkn")]
+unsafe fn aes_key_schedule_256_even_moar_alt(ck: &[u8]) -> VexKeys256 {
+    let mut rk: VexKeys256 = [0; 60];
+    #[rustfmt::skip]
+    unsafe {
+        // a0 - uint32_t rk [AES_256_RK_WORDS]
+        // a1 - uint8_t  ck [AES_256_CK_BYTE ]
+        core::arch::asm!(
+            "lw  a2,  0(a1)",
+            "lw  a3,  4(a1)",
+            "lw  a4,  8(a1)",
+            "lw  a5, 12(a1)",
+            "lw  a7, 16(a1)",
+            "lw  t5, 20(a1)",
+            "lw  t6, 24(a1)",
+            "lw  t2, 28(a1)",
+
+            "mv      a6, a0",
+            "addi    t0, a0, 56*4",       //
+            "la      t1, 50f",// t1 = round constant pointer
+
+            "sw      a2,  0(a6)",         // rkp[0]
+            "sw      a3,  4(a6)",         // rkp[1]
+            "sw      a4,  8(a6)",         // rkp[2]
+            "sw      a5, 12(a6)",         // rkp[3]
+
+        "30:",            // Loop start
+
+            "sw      a7, 16(a6)",         // rkp[4]
+            "sw      t5, 20(a6)",         // rkp[5]
+            "sw      t6, 24(a6)",         // rkp[6]
+            "sw      t2, 28(a6)",         // rkp[7]
+
+            "addi    a6, a6, 32",        // increment rkp
+
+
+            "lbu     t4, 0(t1)",         // Load round constant byte
+            "addi    t1, t1, 1",         // Increment round constant byte
+            "xor     a2, a2, t4",         // c0 ^= rcp
+
+            // "ROR32I t3, t4, t2, 8",        // tr = ROR32(c3, 8)
+            "srli t4, t2, 8",
+            "slli t3, t2, 32-8",
+            "or   t3, t3, t4",
+
+            "aes32esi a2, a2, t3, 0",   // tr = sbox(tr)
+            "aes32esi a2, a2, t3, 1",   //
+            "aes32esi a2, a2, t3, 2",   //
+            "aes32esi a2, a2, t3, 3",   //
+
+            "xor     a3, a3, a2",          // a3 ^= a2
+            "xor     a4, a4, a3",          // a4 ^= a3
+            "xor     a5, a5, a4",          // a5 ^= a4
+
+            "sw      a2,  0(a6)",         // rkp[0]
+            "sw      a3,  4(a6)",         // rkp[1]
+            "sw      a4,  8(a6)",         // rkp[2]
+            "sw      a5, 12(a6)",         // rkp[3]
+
+            "beq     t0, a6, 40f",
+
+            "aes32esi a7, a7, a5, 0",   // tr = sbox(tr)
+            "aes32esi a7, a7, a5, 1",   //
+            "aes32esi a7, a7, a5, 2",   //
+            "aes32esi a7, a7, a5, 3",   //
+
+            "xor     t5, t5, a7",          // t5 ^= a7
+            "xor     t6, t6, t5",          // t6 ^= t5
+            "xor     t2, t2, t6",          // t2 ^= t6
+
+            "j 30b",                   // Loop continue
+
+        "50:",
+            ".byte 0x01, 0x02, 0x04, 0x08, 0x10",
+            ".byte 0x20, 0x40, 0x80, 0x1b, 0x36",
+
+        "40:",
+            "nop",  // was ret
+
+            in("a0") rk.as_mut_ptr(),
+            in("a1") ck.as_ptr(),
+        );
+    };
+    rk
+}
+
+pub fn aes_vexriscv_decrypt_asm_wrapper(key: &VexKeys256, block: &[u8], _rounds: u32) -> [u8; 16] {
+    // safe because our target architecture supports "zkn"
+    unsafe { aes256_vexriscv_decrypt_asm(key, block) }
+}
+
+#[repr(C, align(16))]
+struct AlignedBlock {
+    pub data: [u8; 16],
+}
+#[target_feature(enable = "zkn")]
+pub unsafe fn aes256_vexriscv_decrypt_asm(key: &VexKeys256, block: &[u8]) -> [u8; 16] {
+    let mut ct = AlignedBlock { data: [0u8; 16] };
+    ct.data.copy_from_slice(block);
+
+    let mut pt = AlignedBlock { data: [0u8; 16] };
+    let mut pt_ptr = pt.data.as_mut_ptr();
+
+    #[rustfmt::skip]
+    unsafe {
+        // a0 - uint8_t     pt [16],
+        // a1 - uint8_t     ct [16],
+        // a2 - uint32_t  * rk,
+        core::arch::asm!(
+            "addi    a3, a2, 16*14",                       // kp = rk + 4*nr
+/*
+            "lbu     a4,  3(a1)",
+            "lbu     a5,  7(a1)",
+            "lbu     a6, 11(a1)",
+            "lbu     a7, 15(a1)",
+            "slli    a4,a4, 8",
+            "slli    a5,a5, 8",
+            "slli    a6,a6, 8",
+            "slli    a7,a7, 8",
+            "lbu     t0,  2(a1)",
+            "lbu     t1,  6(a1)",
+            "lbu     t2, 10(a1)",
+            "lbu     t3, 14(a1)",
+            "or      a4, a4, t0",
+            "or      a5, a5, t1",
+            "or      a6, a6, t2",
+            "or      a7, a7, t3",
+            "slli    a4,a4, 8",
+            "slli    a5,a5, 8",
+            "slli    a6,a6, 8",
+            "slli    a7,a7, 8",
+            "lbu     t0,  1(a1)",
+            "lbu     t1,  5(a1)",
+            "lbu     t2,  9(a1)",
+            "lbu     t3, 13(a1)",
+            "or      a4, a4, t0",
+            "or      a5, a5, t1",
+            "or      a6, a6, t2",
+            "or      a7, a7, t3",
+            "slli    a4,a4, 8",
+            "slli    a5,a5, 8",
+            "slli    a6,a6, 8",
+            "slli    a7,a7, 8",
+            "lbu     t0,  0(a1)",
+            "lbu     t1,  4(a1)",
+            "lbu     t2,  8(a1)",
+            "lbu     t3, 12(a1)",
+            "or      a4, a4, t0",
+            "or      a5, a5, t1",
+            "or      a6, a6, t2",
+            "or      a7, a7, t3",
+*/
+            "lw      a4, 0(a1)",
+            "lw      a5, 4(a1)",
+            "lw      a6, 8(a1)",
+            "lw      a7, 12(a1)",
+
+            "lw      t0,  0(a3)",                          // Load Round Key
+            "lw      t1,  4(a3)",
+            "lw      t2,  8(a3)",
+            "lw      t3, 12(a3)",
+
+            "xor     a4, a4, t0",                          // Add Round Key
+            "xor     a5, a5, t1",
+            "xor     a6, a6, t2",
+            "xor     a7, a7, t3",
+
+            "addi    a3, a3, -32",                         // Loop counter
+
+        "20:", // .aes_dec_block_l0:
+
+            "lw      t0, 16(a3)",                      // Load Round Key
+            "lw      t1, 20(a3)",
+            "lw      t2, 24(a3)",
+            "lw      t3, 28(a3)",
+
+            "aes32dsmi  t0, t0, a4, 0",                    // Even Round
+            "aes32dsmi  t0, t0, a7, 1",
+            "aes32dsmi  t0, t0, a6, 2",
+            "aes32dsmi  t0, t0, a5, 3",
+
+            "aes32dsmi  t1, t1, a5, 0",
+            "aes32dsmi  t1, t1, a4, 1",
+            "aes32dsmi  t1, t1, a7, 2",
+            "aes32dsmi  t1, t1, a6, 3",
+
+            "aes32dsmi  t2, t2, a6, 0",
+            "aes32dsmi  t2, t2, a5, 1",
+            "aes32dsmi  t2, t2, a4, 2",
+            "aes32dsmi  t2, t2, a7, 3",
+
+            "aes32dsmi  t3, t3, a7, 0",
+            "aes32dsmi  t3, t3, a6, 1",
+            "aes32dsmi  t3, t3, a5, 2",
+            "aes32dsmi  t3, t3, a4, 3",                    // U* contains new state
+
+            "lw      a4,  0(a3)",                      // Load Round Key
+            "lw      a5,  4(a3)",
+            "lw      a6,  8(a3)",
+            "lw      a7, 12(a3)",
+
+            "beq     a2, a3, 30f", // aes_dec_block_l_finish Break from loop
+            "addi    a3, a3, -32",                     // Step Key pointer
+
+            "aes32dsmi  a4, a4, t0, 0",                    // Odd Round
+            "aes32dsmi  a4, a4, t3, 1",
+            "aes32dsmi  a4, a4, t2, 2",
+            "aes32dsmi  a4, a4, t1, 3",
+
+            "aes32dsmi  a5, a5, t1, 0",
+            "aes32dsmi  a5, a5, t0, 1",
+            "aes32dsmi  a5, a5, t3, 2",
+            "aes32dsmi  a5, a5, t2, 3",
+
+            "aes32dsmi  a6, a6, t2, 0",
+            "aes32dsmi  a6, a6, t1, 1",
+            "aes32dsmi  a6, a6, t0, 2",
+            "aes32dsmi  a6, a6, t3, 3",
+
+            "aes32dsmi  a7, a7, t3, 0",
+            "aes32dsmi  a7, a7, t2, 1",
+            "aes32dsmi  a7, a7, t1, 2",
+            "aes32dsmi  a7, a7, t0, 3",                    // T* contains new state
+
+            "j 20b", // .aes_dec_block_l0                         // repeat loop
+
+        "30:", //.aes_dec_block_l_finish:
+
+            "aes32dsi    a4, a4, t0, 0",                       // Final round, no MixColumns
+            "aes32dsi    a4, a4, t3, 1",
+            "aes32dsi    a4, a4, t2, 2",
+            "aes32dsi    a4, a4, t1, 3",
+
+            "aes32dsi    a5, a5, t1, 0",
+            "aes32dsi    a5, a5, t0, 1",
+            "aes32dsi    a5, a5, t3, 2",
+            "aes32dsi    a5, a5, t2, 3",
+
+            "aes32dsi    a6, a6, t2, 0",
+            "aes32dsi    a6, a6, t1, 1",
+            "aes32dsi    a6, a6, t0, 2",
+            "aes32dsi    a6, a6, t3, 3",
+
+            "aes32dsi    a7, a7, t3, 0",
+            "aes32dsi    a7, a7, t2, 1",
+            "aes32dsi    a7, a7, t1, 2",
+            "aes32dsi    a7, a7, t0, 3",                       // T* contains new state
+
+            /*
+            "sb      a4,  0(a0)",
+            "sb      a5,  4(a0)",
+            "sb      a6,  8(a0)",
+            "sb      a7, 12(a0)",
+            "srli    a4, a4, 8",
+            "srli    a5, a5, 8",
+            "srli    a6, a6, 8",
+            "srli    a7, a7, 8",
+            "sb      a4,  1(a0)",
+            "sb      a5,  5(a0)",
+            "sb      a6,  9(a0)",
+            "sb      a7, 13(a0)",
+            "srli    a4, a4, 8",
+            "srli    a5, a5, 8",
+            "srli    a6, a6, 8",
+            "srli    a7, a7, 8",
+            "sb      a4,  2(a0)",
+            "sb      a5,  6(a0)",
+            "sb      a6, 10(a0)",
+            "sb      a7, 14(a0)",
+            "srli    a4, a4, 8",
+            "srli    a5, a5, 8",
+            "srli    a6, a6, 8",
+            "srli    a7, a7, 8",
+            "sb      a4,  3(a0)",
+            "sb      a5,  7(a0)",
+            "sb      a6, 11(a0)",
+            "sb      a7, 15(a0)",
+            */
+
+            "sw  a4, 0(a0)",
+            "sw  a5, 4(a0)",
+            "sw  a6, 8(a0)",
+            "sw  a7, 12(a0)",
+
+            inout("a0") pt_ptr,
+            in("a1") ct.data.as_ptr(),
+            in("a2") key.as_ptr(),
+        );
+    };
+    let pt_slice = unsafe { core::slice::from_raw_parts(pt_ptr, pt.data.len()) };
+    let mut out = [0u8; 16];
+    out.copy_from_slice(pt_slice);
+    out
 }
 
 /// AES-256 round keys
 pub(crate) type VexKeys256 = [u32; 60];
 
+#[cfg(not(feature = "aes-zkn"))]
 pub fn aes256_enc_key_schedule(user_key: &[u8]) -> VexKeys256 { set_encrypt_key_inner_256(user_key, true) }
-
+#[cfg(not(feature = "aes-zkn"))]
 fn set_encrypt_key_inner_256(user_key: &[u8], swap_final: bool) -> VexKeys256 {
     let mut rk: VexKeys256 = [0; 60];
 
@@ -156,9 +574,60 @@ fn set_encrypt_key_inner_256(user_key: &[u8], swap_final: bool) -> VexKeys256 {
             *value = value.swap_bytes();
         }
     }
+    /*
+    for (i, rk) in rk.iter().enumerate() {
+        print!("rk{}: {:08x}\r", i, rk);
+    }
+    */
     rk
 }
 
+fn aes256_dec_key_schedule_asm_wrapper(user_key: &[u8]) -> VexKeys256 {
+    unsafe { aes256_dec_key_schedule_asm(user_key) }
+}
+
+#[target_feature(enable = "zkn")]
+unsafe fn aes256_dec_key_schedule_asm(user_key: &[u8]) -> VexKeys256 {
+    let mut rk: VexKeys256 = aes_key_schedule_256_even_moar_alt(user_key);
+    #[rustfmt::skip]
+    unsafe {
+        core::arch::asm!(
+            // a0 - uint32_t rk [AES_256_RK_WORDS]
+            // a1 - uint8_t  ck [AES_256_CK_BYTE ]
+
+            "addi    a2, a0, 16",              // a0 = &a0[ 4]
+            "addi    a3, a0, 56*4",            // a1 = &a0[40]
+
+        "20:",
+
+            "lw   t0, 0(a2)",              // Load key word
+
+            "li        t1, 0",
+            "aes32esi  t1, t1, t0, 0",     // Sub Word Forward
+            "aes32esi  t1, t1, t0, 1 ",
+            "aes32esi  t1, t1, t0, 2",
+            "aes32esi  t1, t1, t0, 3",
+
+            "li        t0, 0",
+            "aes32dsmi t0, t0, t1, 0",     // Sub Word Inverse & Inverse MixColumns
+            "aes32dsmi t0, t0, t1, 1",
+            "aes32dsmi t0, t0, t1, 2",
+            "aes32dsmi t0, t0, t1, 3",
+
+            "sw   t0, 0(a2)",             // Store key word.
+
+            "addi a2, a2, 4",            // Increment round key pointer
+            "bne  a2, a3, 20b", // Finished yet?
+
+            in("a0") rk.as_mut_ptr(),
+            in("a1") user_key.as_ptr(),
+        );
+    };
+    let mut rk_out: VexKeys256 = [0u32; 60];
+    rk_out.copy_from_slice(&rk);
+    rk_out
+}
+#[cfg(not(feature = "aes-zkn"))]
 pub fn aes256_dec_key_schedule(user_key: &[u8]) -> VexKeys256 {
     let mut rk = set_encrypt_key_inner_256(user_key, false);
 
@@ -224,6 +693,7 @@ pub(crate) enum AesByte {
     Byte3 = 3,
 }
 
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) const TE0: [u32; 256] = [
     0xc66363a5, 0xf87c7c84, 0xee777799, 0xf67b7b8d, 0xfff2f20d, 0xd66b6bbd, 0xde6f6fb1, 0x91c5c554,
     0x60303050, 0x02010103, 0xce6767a9, 0x562b2b7d, 0xe7fefe19, 0xb5d7d762, 0x4dababe6, 0xec76769a,
@@ -258,7 +728,7 @@ pub(crate) const TE0: [u32; 256] = [
     0x038c8c8f, 0x59a1a1f8, 0x09898980, 0x1a0d0d17, 0x65bfbfda, 0xd7e6e631, 0x844242c6, 0xd06868b8,
     0x824141c3, 0x299999b0, 0x5a2d2d77, 0x1e0f0f11, 0x7bb0b0cb, 0xa85454fc, 0x6dbbbbd6, 0x2c16163a,
 ];
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) const TE1: [u32; 256] = [
     0xa5c66363, 0x84f87c7c, 0x99ee7777, 0x8df67b7b, 0x0dfff2f2, 0xbdd66b6b, 0xb1de6f6f, 0x5491c5c5,
     0x50603030, 0x03020101, 0xa9ce6767, 0x7d562b2b, 0x19e7fefe, 0x62b5d7d7, 0xe64dabab, 0x9aec7676,
@@ -293,7 +763,7 @@ pub(crate) const TE1: [u32; 256] = [
     0x8f038c8c, 0xf859a1a1, 0x80098989, 0x171a0d0d, 0xda65bfbf, 0x31d7e6e6, 0xc6844242, 0xb8d06868,
     0xc3824141, 0xb0299999, 0x775a2d2d, 0x111e0f0f, 0xcb7bb0b0, 0xfca85454, 0xd66dbbbb, 0x3a2c1616,
 ];
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) const TE2: [u32; 256] = [
     0x63a5c663, 0x7c84f87c, 0x7799ee77, 0x7b8df67b, 0xf20dfff2, 0x6bbdd66b, 0x6fb1de6f, 0xc55491c5,
     0x30506030, 0x01030201, 0x67a9ce67, 0x2b7d562b, 0xfe19e7fe, 0xd762b5d7, 0xabe64dab, 0x769aec76,
@@ -328,7 +798,7 @@ pub(crate) const TE2: [u32; 256] = [
     0x8c8f038c, 0xa1f859a1, 0x89800989, 0x0d171a0d, 0xbfda65bf, 0xe631d7e6, 0x42c68442, 0x68b8d068,
     0x41c38241, 0x99b02999, 0x2d775a2d, 0x0f111e0f, 0xb0cb7bb0, 0x54fca854, 0xbbd66dbb, 0x163a2c16,
 ];
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) const TE3: [u32; 256] = [
     0x6363a5c6, 0x7c7c84f8, 0x777799ee, 0x7b7b8df6, 0xf2f20dff, 0x6b6bbdd6, 0x6f6fb1de, 0xc5c55491,
     0x30305060, 0x01010302, 0x6767a9ce, 0x2b2b7d56, 0xfefe19e7, 0xd7d762b5, 0xababe64d, 0x76769aec,
@@ -363,7 +833,7 @@ pub(crate) const TE3: [u32; 256] = [
     0x8c8c8f03, 0xa1a1f859, 0x89898009, 0x0d0d171a, 0xbfbfda65, 0xe6e631d7, 0x4242c684, 0x6868b8d0,
     0x4141c382, 0x9999b029, 0x2d2d775a, 0x0f0f111e, 0xb0b0cb7b, 0x5454fca8, 0xbbbbd66d, 0x16163a2c,
 ];
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) const TD0: [u32; 256] = [
     0x51f4a750, 0x7e416553, 0x1a17a4c3, 0x3a275e96, 0x3bab6bcb, 0x1f9d45f1, 0xacfa58ab, 0x4be30393,
     0x2030fa55, 0xad766df6, 0x88cc7691, 0xf5024c25, 0x4fe5d7fc, 0xc52acbd7, 0x26354480, 0xb562a38f,
@@ -398,7 +868,7 @@ pub(crate) const TD0: [u32; 256] = [
     0xcaaff381, 0xb968c43e, 0x3824342c, 0xc2a3405f, 0x161dc372, 0xbce2250c, 0x283c498b, 0xff0d9541,
     0x39a80171, 0x080cb3de, 0xd8b4e49c, 0x6456c190, 0x7bcb8461, 0xd532b670, 0x486c5c74, 0xd0b85742,
 ];
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) const TD1: [u32; 256] = [
     0x5051f4a7, 0x537e4165, 0xc31a17a4, 0x963a275e, 0xcb3bab6b, 0xf11f9d45, 0xabacfa58, 0x934be303,
     0x552030fa, 0xf6ad766d, 0x9188cc76, 0x25f5024c, 0xfc4fe5d7, 0xd7c52acb, 0x80263544, 0x8fb562a3,
@@ -433,7 +903,7 @@ pub(crate) const TD1: [u32; 256] = [
     0x81caaff3, 0x3eb968c4, 0x2c382434, 0x5fc2a340, 0x72161dc3, 0x0cbce225, 0x8b283c49, 0x41ff0d95,
     0x7139a801, 0xde080cb3, 0x9cd8b4e4, 0x906456c1, 0x617bcb84, 0x70d532b6, 0x74486c5c, 0x42d0b857,
 ];
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) const TD2: [u32; 256] = [
     0xa75051f4, 0x65537e41, 0xa4c31a17, 0x5e963a27, 0x6bcb3bab, 0x45f11f9d, 0x58abacfa, 0x03934be3,
     0xfa552030, 0x6df6ad76, 0x769188cc, 0x4c25f502, 0xd7fc4fe5, 0xcbd7c52a, 0x44802635, 0xa38fb562,
@@ -468,6 +938,7 @@ pub(crate) const TD2: [u32; 256] = [
     0xf381caaf, 0xc43eb968, 0x342c3824, 0x405fc2a3, 0xc372161d, 0x250cbce2, 0x498b283c, 0x9541ff0d,
     0x017139a8, 0xb3de080c, 0xe49cd8b4, 0xc1906456, 0x84617bcb, 0xb670d532, 0x5c74486c, 0x5742d0b8,
 ];
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) const TD3: [u32; 256] = [
     0xf4a75051, 0x4165537e, 0x17a4c31a, 0x275e963a, 0xab6bcb3b, 0x9d45f11f, 0xfa58abac, 0xe303934b,
     0x30fa5520, 0x766df6ad, 0xcc769188, 0x024c25f5, 0xe5d7fc4f, 0x2acbd7c5, 0x35448026, 0x62a38fb5,
@@ -502,12 +973,13 @@ pub(crate) const TD3: [u32; 256] = [
     0xaff381ca, 0x68c43eb9, 0x24342c38, 0xa3405fc2, 0x1dc37216, 0xe2250cbc, 0x3c498b28, 0x0d9541ff,
     0xa8017139, 0x0cb3de08, 0xb4e49cd8, 0x56c19064, 0xcb84617b, 0x32b670d5, 0x6c5c7448, 0xb85742d0,
 ];
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) const RCON: [u32; 10] = [
     0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000,
     0x1B000000, 0x36000000, /* for 128-bit blocks, Rijndael never uses more than 10 rcon values */
 ];
 
+#[cfg(not(feature = "aes-zkn"))]
 global_asm!(
     ".global vex_aes_enc_id_0",
     "vex_aes_enc_id_0:",
@@ -575,6 +1047,95 @@ global_asm!(
     "    ret",
 );
 
+/*
+    The ratified AES instruction format is as follows:
+    SS10_DM1X_XXXXYYYYY000ZZZZ_Z011_0011
+    - XXXXX is the register file source 2 (RS2)
+    - YYYYY is the register file source 1 (RS1)
+    - ZZZZZ is the register file destination
+    - D=1 means decrypt, D=0 mean encrypt
+    - M=1 means middle (full) round, M=0 means last round (=> e.g., !L)
+    - SS specify which byte should be used from RS2 for the processing
+
+    enc-mid
+    0010_0110 => 26, 66, A6, E6
+    enc-last
+    0010_0010 => 22, 62, A2, E2
+    dec-mid
+    0010_1110 => 2E, 6E, AE, EE
+    dec-last
+    0010_1010 => 2A, 6A, AA, EA
+*/
+global_asm!(
+    ".global vex_aes_enc_id_0",
+    "vex_aes_enc_id_0:",
+    "    .word 0x26b50533", // vex_aes_enc_id a0, a1, a0, #0
+    "    ret",
+    ".global vex_aes_enc_id_1",
+    "vex_aes_enc_id_1:",
+    "    .word 0x66b50533", // vex_aes_enc_id a0, a1, a0, #1
+    "    ret",
+    ".global vex_aes_enc_id_2",
+    "vex_aes_enc_id_2:",
+    "    .word 0xa6b50533", // vex_aes_enc_id a0, a1, a0, #2
+    "    ret",
+    ".global vex_aes_enc_id_3",
+    "vex_aes_enc_id_3:",
+    "    .word 0xe6b50533", // vex_aes_enc_id a0, a1, a0, #3
+    "    ret",
+    ".global vex_aes_enc_id_last_0",
+    "vex_aes_enc_id_last_0:",
+    "    .word 0x22b50533", // vex_aes_enc_id_last a0, a1, a0, #0
+    "    ret",
+    ".global vex_aes_enc_id_last_1",
+    "vex_aes_enc_id_last_1:",
+    "    .word 0x62b50533", // vex_aes_enc_id_last a0, a1, a0, #1
+    "    ret",
+    ".global vex_aes_enc_id_last_2",
+    "vex_aes_enc_id_last_2:",
+    "    .word 0xa2b50533", // vex_aes_enc_id_last a0, a1, a0, #2
+    "    ret",
+    ".global vex_aes_enc_id_last_3",
+    "vex_aes_enc_id_last_3:",
+    "    .word 0xe2b50533", // vex_aes_enc_id_last a0, a1, a0, #3
+    "    ret",
+);
+/*
+    ".global vex_aes_dec_id_0",
+    "vex_aes_dec_id_0:",
+    "    .word 0x2eb50533", // vex_aes_dec_id a0, a1, a0, #0
+    "    ret",
+    ".global vex_aes_dec_id_1",
+    "vex_aes_dec_id_1:",
+    "    .word 0x6eb50533", // vex_aes_dec_id a0, a1, a0, #1
+    "    ret",
+    ".global vex_aes_dec_id_2",
+    "vex_aes_dec_id_2:",
+    "    .word 0xaeb50533", // vex_aes_dec_id a0, a1, a0, #2
+    "    ret",
+    ".global vex_aes_dec_id_3",
+    "vex_aes_dec_id_3:",
+    "    .word 0xeeb50533", // vex_aes_dec_id a0, a1, a0, #3
+    "    ret",
+    ".global vex_aes_dec_id_last_0",
+    "vex_aes_dec_id_last_0:",
+    "    .word 0x2ab50533", // vex_aes_dec_id_last a0, a1, a0, #0
+    "    ret",
+    ".global vex_aes_dec_id_last_1",
+    "vex_aes_dec_id_last_1:",
+    "    .word 0x6ab50533", // vex_aes_dec_id_last a0, a1, a0, #1
+    "    ret",
+    ".global vex_aes_dec_id_last_2",
+    "vex_aes_dec_id_last_2:",
+    "    .word 0xaab50533", // vex_aes_dec_id_last a0, a1, a0, #2
+    "    ret",
+    ".global vex_aes_dec_id_last_3",
+    "vex_aes_dec_id_last_3:",
+    "    .word 0xeab50533", // vex_aes_dec_id_last a0, a1, a0, #3
+    "    ret",
+);
+*/
+
 pub(crate) fn aes_enc_round(arg1: u32, arg2: u32, id: AesByte) -> u32 {
     extern "C" {
         fn vex_aes_enc_id_0(arg1: u32, arg2: u32) -> u32;
@@ -604,7 +1165,7 @@ pub(crate) fn aes_enc_round_last(arg1: u32, arg2: u32, id: AesByte) -> u32 {
         AesByte::Byte3 => unsafe { vex_aes_enc_id_last_3(arg1, arg2) },
     }
 }
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) fn aes_dec_round(arg1: u32, arg2: u32, id: AesByte) -> u32 {
     extern "C" {
         fn vex_aes_dec_id_0(arg1: u32, arg2: u32) -> u32;
@@ -619,7 +1180,7 @@ pub(crate) fn aes_dec_round(arg1: u32, arg2: u32, id: AesByte) -> u32 {
         AesByte::Byte3 => unsafe { vex_aes_dec_id_3(arg1, arg2) },
     }
 }
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) fn aes_dec_round_last(arg1: u32, arg2: u32, id: AesByte) -> u32 {
     extern "C" {
         fn vex_aes_dec_id_last_0(arg1: u32, arg2: u32) -> u32;
@@ -634,7 +1195,7 @@ pub(crate) fn aes_dec_round_last(arg1: u32, arg2: u32, id: AesByte) -> u32 {
         AesByte::Byte3 => unsafe { vex_aes_dec_id_last_3(arg1, arg2) },
     }
 }
-
+#[cfg(not(feature = "aes-zkn"))]
 pub(crate) fn get_u32_be(input: &[u8], offset: usize) -> u32 {
     u32::from_be_bytes(input[offset..offset + 4].try_into().unwrap())
 }
@@ -908,6 +1469,7 @@ macro_rules! define_aes_impl {
     };
 }
 
+// We leave this one encoded in legacy style to prove interop between styles
 pub fn aes_vexriscv_encrypt(key: &VexKeys256, block: &[u8], rounds: u32) -> [u8; 16] {
     let rk = key;
     let mut input: [u8; 16] = [0; 16];
@@ -1024,7 +1586,7 @@ pub fn aes_vexriscv_encrypt(key: &VexKeys256, block: &[u8], rounds: u32) -> [u8;
     set_u32(&mut output, 12, s3);
     output
 }
-
+#[cfg(not(feature = "aes-zkn"))]
 pub fn aes_vexriscv_decrypt(key: &VexKeys256, block: &[u8], rounds: u32) -> [u8; 16] {
     let rk = key;
     let mut input: [u8; 16] = [0; 16];
@@ -1142,6 +1704,7 @@ pub fn aes_vexriscv_decrypt(key: &VexKeys256, block: &[u8], rounds: u32) -> [u8;
     output
 }
 
+#[cfg(not(feature = "aes-zkn"))]
 define_aes_impl!(
     Aes256,
     Aes256Enc,
@@ -1155,6 +1718,24 @@ define_aes_impl!(
     aes256_dec_key_schedule,
     aes256_enc_key_schedule,
     aes_vexriscv_decrypt,
+    aes_vexriscv_encrypt,
+    "AES-256 block cipher instance"
+);
+
+#[cfg(feature = "aes-zkn")]
+define_aes_impl!(
+    Aes256,
+    Aes256Enc,
+    Aes256Dec,
+    Aes256BackEnc,
+    Aes256BackDec,
+    U32,
+    256,
+    VexKeys256,
+    14,
+    aes256_dec_key_schedule_asm_wrapper,
+    aes_key_schedule_256_even_moar_alt_wrapper,
+    aes_vexriscv_decrypt_asm_wrapper,
     aes_vexriscv_encrypt,
     "AES-256 block cipher instance"
 );

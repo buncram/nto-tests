@@ -110,6 +110,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     uart.tiny_write_str("booting... 001\r");
     reset_ticktimer();
 
+    let mut aes_tests = aes::AesTests::new(true);
     let mut reset_value_test = utils::ResetValue::new(true);
     let mut bio_tests = bio::BioTests::new(true);
     let mut satp_setup = satp::SatpSetup::new(true);
@@ -119,7 +120,6 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut wfi_tests = irqs::WfiTests::new(true);
     let mut ram_tests = ramtests::RamTests::new(true);
     let mut timer0_tests = timer0::Timer0Tests::new(true);
-    let mut aes_tests = aes::AesTests::new(true);
 
     let mut mbox_test = mbox::MboxTests::new(false);
     let mut rram_tests = rram::RramTests::new(false);
