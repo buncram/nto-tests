@@ -27,6 +27,8 @@ pub extern "C" fn _start() {
 
             // Place the stack pointer at the end of RAM
             "mv          sp, {ram_top}",
+            // subtract four from sp to make room for a DMA "gutter"
+            "addi        sp, sp, -4",
 
             // Install a machine mode trap handler
             "la          t0, _start",
