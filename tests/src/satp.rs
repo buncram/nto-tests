@@ -16,6 +16,7 @@ crate::impl_test!(SatpSetup, "SATP Setup", SATP_SETUP);
 impl TestRunner for SatpSetup {
     fn run(&mut self) {
         satp_setup();
+        print!("vmem enabled\r");
         self.passing_tests += 1;
     }
 }
@@ -114,6 +115,7 @@ pub fn satp_setup() {
         set_l2_pte(CODE_VA + offset, RERAM_PA + offset, &mut code_pt, FLG_X | FLG_R | FLG_U | FLG_W);
     }
 
+    print!("mem pte\r");
     // map sram. Mapping is 1:1, so we use _VA and _PA targets for both args
     const SRAM_LEN: usize = 0x20_0000; // 2 megs
     // make the page tables not writeable
@@ -130,6 +132,7 @@ pub fn satp_setup() {
         set_l2_pte(CSR_VA + offset, CSR_VA + offset, &mut csr_pt, FLG_W | FLG_R | FLG_U);
     }
     // map APB peripherals (includes a window for the simulation bench)
+    print!("peri pte\r");
     const PERI_LEN: usize = 0x10_0000; // 1M window - this will also map all the peripherals, including SCE, except PIO
     for offset in (0..PERI_LEN).step_by(PAGE_SIZE) {
         set_l2_pte(PERI_VA + offset, PERI_VA + offset, &mut peri_pt, FLG_W | FLG_R | FLG_U);
@@ -142,6 +145,7 @@ pub fn satp_setup() {
     }
     // map the RV peripherals
     const RV_LEN: usize = 0x2_0000; // 128k window
+    print!("rv pte\r");
     for offset in (0..RV_LEN).step_by(PAGE_SIZE) {
         set_l2_pte(RV_VA + offset, RV_VA + offset, &mut rv_pt, FLG_W | FLG_R | FLG_U);
     }
@@ -162,6 +166,7 @@ pub fn satp_setup() {
     let asid: u32 = 1;
     let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
 
+    print!("vmem pivot\r");
     unsafe {
         core::arch::asm!(
             // Delegate as much as we can supervisor mode
@@ -177,6 +182,12 @@ pub fn satp_setup() {
             // Enable the MMU (once we issue `mret`) and flush the cache
             "csrw        satp, {satp_val}",
             "sfence.vma",
+            ".word 0x500F",
+            "nop",
+            "nop",
+            "nop",
+            "nop",
+            "nop",
             satp_val = in(reg) satp,
         );
         core::arch::asm!(
