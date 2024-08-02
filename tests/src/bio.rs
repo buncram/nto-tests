@@ -28,6 +28,8 @@ const BIO_TESTS: usize =
     // event_aliases
     + 1
     // dmareq_test
+    + 1
+    // filter test
     + 1;
 crate::impl_test!(BioTests, "BIO", BIO_TESTS);
 impl TestRunner for BioTests {
@@ -48,10 +50,14 @@ impl TestRunner for BioTests {
 
         self.passing_tests += bio_tests::units::hello_world();
 
+        self.passing_tests += bio_tests::dma::filter_test();
+
+        bio_tests::dma::dma_filter_off();
         self.passing_tests += bio_tests::dma::dmareq_test();
         self.passing_tests += bio_tests::units::event_aliases();
         self.passing_tests += bio_tests::units::fifo_alias_tests();
 
+        bio_tests::dma::dma_filter_off();
         self.passing_tests += bio_tests::dma::dma_basic(false); // 4
         self.passing_tests += bio_tests::dma::dma_basic(true); // 4
         self.passing_tests += bio_tests::dma::dma_bytes(); // 4
