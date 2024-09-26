@@ -6,7 +6,7 @@ const BIO_TESTS: usize =
     // get_id
     1
     // dma
-    + 4 * 5 + 1
+    + 4 * 6 + 1
     // stack test
     + 1
     // hello word, hello multiverse, aclk_tests
@@ -31,7 +31,14 @@ const BIO_TESTS: usize =
     + 1
     // filter test
     + 1;
-crate::impl_test!(BioTests, "BIO", BIO_TESTS);
+
+// config hack that only works for one optional feature like this :-/
+#[cfg(not(feature = "bio-mul"))]
+const BIO_TESTS_FINAL: usize = BIO_TESTS;
+#[cfg(feature = "bio-mul")]
+const BIO_TESTS_FINAL: usize = BIO_TESTS + 1;
+
+crate::impl_test!(BioTests, "BIO", BIO_TESTS_FINAL);
 impl TestRunner for BioTests {
     fn run(&mut self) {
         let id = get_id();
@@ -50,6 +57,23 @@ impl TestRunner for BioTests {
 
         self.passing_tests += bio_tests::units::hello_world();
 
+        self.passing_tests += bio_tests::arith::stack_test();
+        #[cfg(feature = "bio-mul")]
+        {
+            // safety: this is safe only if the target supports multiplication
+            self.passing_tests += unsafe { bio_tests::arith::mac_test() }; // 1
+        }
+
+        bio_tests::dma::dma_filter_off();
+        self.passing_tests += bio_tests::dma::dma_basic(false); // 4
+        self.passing_tests += bio_tests::dma::dma_basic(false); // 4
+        self.passing_tests += bio_tests::dma::dma_basic(true); // 4
+        self.passing_tests += bio_tests::dma::dma_bytes(); // 4
+        self.passing_tests += bio_tests::dma::dma_u16(); // 4
+        self.passing_tests += bio_tests::dma::dma_multicore(); // 1
+        self.passing_tests += bio_tests::dma::dma_coincident(); // 4
+        self.passing_tests += bio_tests::units::aclk_tests();
+
         self.passing_tests += bio_tests::dma::filter_test();
 
         bio_tests::dma::dma_filter_off();
@@ -57,23 +81,11 @@ impl TestRunner for BioTests {
         self.passing_tests += bio_tests::units::event_aliases();
         self.passing_tests += bio_tests::units::fifo_alias_tests();
 
-        bio_tests::dma::dma_filter_off();
-        self.passing_tests += bio_tests::dma::dma_basic(false); // 4
-        self.passing_tests += bio_tests::dma::dma_basic(true); // 4
-        self.passing_tests += bio_tests::dma::dma_bytes(); // 4
-        self.passing_tests += bio_tests::dma::dma_u16(); // 4
-        self.passing_tests += bio_tests::dma::dma_multicore(); // 1
-        self.passing_tests += bio_tests::dma::dma_coincident(); // 4
-
-        self.passing_tests += bio_tests::arith::stack_test();
-
         self.passing_tests += bio_tests::units::hello_multiverse();
-        self.passing_tests += bio_tests::units::aclk_tests();
         self.passing_tests += bio_tests::units::fifo_basic();
         self.passing_tests += bio_tests::units::host_fifo_tests();
 
         self.passing_tests += bio_tests::spi::spi_test();
-
         self.passing_tests += bio_tests::i2c::i2c_test();
         self.passing_tests += bio_tests::i2c::complex_i2c_test();
 

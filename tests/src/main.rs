@@ -122,7 +122,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut timer0_tests = timer0::Timer0Tests::new(true);
 
     let mut mbox_test = mbox::MboxTests::new(false);
-    let mut rram_tests = rram::RramTests::new(false);
+    let mut rram_tests = rram::RramTests::new(false); // NOTE THIS SHOULD BE ENABLED IN FINAL VERSION
 
     let mut setup_uart2_test = init::SetupUart2Tests::new(false);
     let mut pio_quick_tests = pio::PioQuickTests::new(false);
@@ -192,15 +192,11 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
 mod panic_handler {
     use core::panic::PanicInfo;
 
-    use crate::debug;
     #[panic_handler]
     fn handle_panic(arg: &PanicInfo) -> ! {
-        //crate::println!("{}", _arg);
-        let mut uart = debug::Uart {};
-        if let Some(s) = arg.payload().downcast_ref::<&str>() {
-            uart.tiny_write_str(s);
-        } else {
-            uart.tiny_write_str("unspecified panic!\n\r");
+        crate::println!("{}", arg);
+        if let Some(location) = arg.location() {
+            crate::println!("At '{}'@{}", location.file(), location.line(),);
         }
         // exit the simulation
         let mut test_cfg = utralib::CSR::new(utralib::utra::csrtest::HW_CSRTEST_BASE as *mut u32);
