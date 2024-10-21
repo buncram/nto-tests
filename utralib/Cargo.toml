@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 
 [build-dependencies]
-svd2utra = { path = "../../xous-core/svd2utra/" }
+svd2utra = { path = "../svd2utra/" }
 
 [features]
 std = []

@@ -1,9 +1,9 @@
 fn main() {
     // the first file in this list takes priority for the vendor extensions.
     let svd_files = vec![
-        "../../cram-soc/build/software/soc.svd".to_string(),
-        "../../cram-soc/build/software/core.svd".to_string(),
-        "../../cram-soc/include/daric.svd".to_string(),
+        "../svd/soc.svd".to_string(),
+        "../svd/core.svd".to_string(),
+        "../svd/daric.svd".to_string(),
     ];
     let mut svd_filehandles = vec![];
     for svd_filename in svd_files {
