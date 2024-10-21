@@ -23,6 +23,28 @@ To build the firmware, first you will need the Visual Studio build tools, and th
    - Start a new terminal session, and type `riscv-none-elf-objdump.exe --version` and confirm that the command can succeed.
 
 You are now ready to prepare the build environment.
+
+## Preparing the Build Environment
+
+### Clone the Code
+You will need to have the following directory structure to build the firmware:
+
+```
+your code folder
+   |
+   |------------ nto-tests/
+   |
+   |------------ xous-core/
+```
+
+In other words, you will need to clone both [this repository](https://github.com/buncram/nto-tests) and the [xous-core](https://github.com/betrusted-io/xous-core.git) repository.
+
+You can do this with:
+
+- `cd my_code_folder`
+- `git clone https://github.com/buncram/nto-tests.git`
+- `git clone https://github.com/betrusted-io/xous-core.git`
+
 ## SVD File Dependencies
 
 Correct operation requires the SoC description to be synchronized. Make sure that the following
