@@ -7,3 +7,8 @@ target/
 /*.lst
 /*.map
 
+cm7/*.o
+cm7/*.bin
+cm7/*.dmp
+cm7/*.elf
+
