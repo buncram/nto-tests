@@ -1,0 +1,70 @@
+# vim: noet:ts=4:sw=4:
+
+TOOLCHAIN ?= arm-none-eabi-
+AS        :=  $(TOOLCHAIN)as
+CC        :=  $(TOOLCHAIN)gcc
+CXX       :=  $(TOOLCHAIN)g++
+## TODO if project has cpp, use g++
+LD        :=  $(TOOLCHAIN)gcc
+#LD        :=  $(TOOLCHAIN)g++
+OBJCOPY   :=  $(TOOLCHAIN)objcopy
+OBJDUMP   :=  $(TOOLCHAIN)objdump
+
+############# 
+# TODO , if empty
+#fullmf := $(abspath $(lastword $(MAKEFILE_LIST)))
+#pathmf := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+
+######## SYS obj ########
+
+VPATH += .:../common
+
+OBJS += syscalls.o 
+#OBJS += system_cm7ikmcu.o  startup_armcm7.o
+OBJS += system_ARMCM7.o
+OBJS += startup_ARMCM7.o
+OBJS += daric_util.o
+
+DARIC_LIB_PREFIX = -I../../
+
+INCLUDES += $(DARIC_LIB_PREFIX)CMSIS/Core/Include
+INCLUDES += $(DARIC_LIB_PREFIX)Device/ARM/ARMCM7/Include
+INCLUDES += $(DARIC_LIB_PREFIX)Device/ARM/cm7ikmcu/Include
+INCLUDES += -I../common
+
+ # TODO INCLUDES += $(DARIC_LIB_PREFIX)Device/DARIC/daric/Include
+
+# Common flags for GCC G++ and LD
+COMMONFLAGS += -O0 -g
+COMMONFLAGS += -fdiagnostics-color=always
+COMMONFLAGS += -ffunction-sections -fdata-sections
+COMMONFLAGS += -Wno-psabi -Wall
+COMMONFLAGS += -Wno-builtin-macro-redefined -D__TIMESTAMP__=$$(date -u +'"%Y-%m-%dZ%H:%M:%S"')
+COMMONFLAGS += -DARMCM7_DP
+# Common flags for as, gcc, g++, and ld
+COMMONFLAGS   += -mcpu=cortex-m7 -mthumb
+#CFLAGS   += -mcpu=cortex-m7 -mthumb 
+#CXXFLAGS += -mcpu=cortex-m7 -mthumb 
+## FPU config, pick only ONE
+COMMONFLAGS   += 
+#CFLAGS   += -mfloat-abi=hard -mfpu=fpv5-d16 
+#CXXFLAGS += -mfloat-abi=hard -mfpu=fpv5-d16 
+
+#COMMONFLAGS += -mfloat-abi=hard -mfpu=fpv5-sp-d16 -DARMCM7_SP
+#COMMONFLAGS += -mfloat-abi=soft -DARMCM7
+
+######## Linker
+## LD script must use absolute path
+
+LDFLAGS +=  -nostartfiles
+# for real ld
+#LDFLAGS += $(addprefix -T,$(LD_FILES))
+# ,-Map=$(TARGETS).map
+#LDFLAGS +=  -Wa,-mimplicit-thumb
+#LDFLAGS += -nostdlib
+
+######## objcopy and objdump ########
+
+CPFLAGS = --output-target=binary --strip-debug
+ODFLAGS = -x --syms -S --disassemble
+
