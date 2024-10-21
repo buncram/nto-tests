@@ -23,36 +23,14 @@ To build the firmware, first you will need the Visual Studio build tools, and th
    - Start a new terminal session, and type `riscv-none-elf-objdump.exe --version` and confirm that the command can succeed.
 
 You are now ready to prepare the build environment.
-## Preparing the Build Environment
+## SVD File Dependencies
 
-### Clone the Code
-You will need to have the following directory structure to build the firmware:
+Correct operation requires the SoC description to be synchronized. Make sure that the following
+SVD files from the `cram-soc` SoC repository are up to date in the `svd` directory for this repo:
 
-```
-your code folder
-   |
-   |------------ cram-soc/
-   |
-   |------------ xous-cramium/
-```
-
-In other words, you will need to clone both [this repository](https://github.com/buncram/cram-soc) and the [xous-cramium](https://github.com/buncram/xous-cramium.git) repository.
-
-You can do this with:
-
-- `cd my_code_folder`
-- `git clone https://github.com/buncram/cram-soc.git`
-- `git clone https://github.com/buncram/xous-cramium.git`
-
-and then `cd cram-soc`
-
-### Copy the SoC Descriptor Files
-
-If you are not building the SoC from source, you will need to copy the descriptor files. Do this with the following commands from the `cram-soc` directory:
-
-`mkdir -p build/software`
-`cp candidate/soc.svd build/software/`
-`cp candidate/core.svd build/software/`
+- build/software/soc.svd
+- build/software/core.svd
+- include/daric.svd
 
 ## Building the Test Firmware
 
