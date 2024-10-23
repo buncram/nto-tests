@@ -180,6 +180,7 @@ void enable_fpu() {
 }
 
 void Reset_Handler(void) {
+#if 0
     if (*((uint32_t *) 0x61100000) != 0xCAFEFACE) {
         *((uint32_t *) 0x61100000) = 0xCAFEFACE;
         __DSB();
@@ -196,7 +197,7 @@ void Reset_Handler(void) {
         *((uint32_t *) (0x5012f000 + 0x8)) = 0x5550; // AFSEL
         *((uint32_t *) (0x5012f000 + 0x14c)) = 0x1803; // OESEL
         __DSB();
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 1000; i++) {
             *((uint32_t *) (0x5012f000 + 0x134)) ^= 2;
             __DSB();
         }
@@ -221,7 +222,7 @@ void Reset_Handler(void) {
         // send_u32_hex(val);
         // print_string("\n\r");
     }
-
+#endif
     /*
     for (int i = 0; i < 1000; i++) {
         print_string("Hello from CM7!\r");
@@ -237,6 +238,7 @@ void Reset_Handler(void) {
 void nothing() {}
 
 void NMI_Handler() {
+    /*
     for (size_t register i = 0; i < IFRAMSIZE / sizeof(uint64_t); i++){
         IFRAM64[i] = 0;
     }
@@ -245,6 +247,7 @@ void NMI_Handler() {
         SRAM64[i] = 0;
     }
     __DSB();
+    */
 }
 
 void Mbox_Handler() {
