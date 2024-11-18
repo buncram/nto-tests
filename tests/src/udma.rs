@@ -1,3 +1,5 @@
+use core::convert::TryInto;
+
 use cramium_hal::board::SPIM_FLASH_IFRAM_ADDR;
 use cramium_hal::ifram::IframRange;
 use cramium_hal::iox::Iox;
@@ -62,6 +64,9 @@ impl TestRunner for UdmaTests {
         crate::println!("initiate read");
         if flash_spim.mem_read(0x1000, &mut dest, false) {
             crate::println!("ram_read success!");
+            for chunk in dest[..32].chunks(4) {
+                crate::println!("{:x}", u32::from_le_bytes(chunk.try_into().unwrap()));
+            }
         } else {
             crate::println!("ram_read failed");
         }
