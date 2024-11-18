@@ -28,6 +28,7 @@ mod rram;
 mod satp;
 mod sce;
 mod timer0;
+mod udma;
 mod utils;
 
 mod asm;
@@ -142,8 +143,12 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut tests: [&mut dyn Test; 18] = [
+    let mut udma_tests = udma::UdmaTests::new(true);
+
+    let mut tests: [&mut dyn Test; 19] = [
         &mut reset_value_test,
+        // for now, run the UDMA tests first
+        &mut udma_tests,
         // quick tests
         &mut aes_tests,
         &mut bio_tests,
