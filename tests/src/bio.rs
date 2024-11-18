@@ -17,7 +17,7 @@ const BIO_TESTS: usize =
     // get_id
     1
     // dma
-    + 4 * 6 + 1
+    + 4 * 5 + 1
     // stack test
     + 1
     // hello word, hello multiverse, aclk_tests
@@ -76,7 +76,6 @@ impl TestRunner for BioTests {
         }
 
         bio_tests::dma::dma_filter_off();
-        self.passing_tests += bio_tests::dma::dma_basic(false); // 4
         self.passing_tests += bio_tests::dma::dma_basic(false); // 4
         self.passing_tests += bio_tests::dma::dma_basic(true); // 4
         self.passing_tests += bio_tests::dma::dma_bytes(); // 4
