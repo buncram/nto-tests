@@ -1,4 +1,4 @@
-use cramium_hal::board::SPIM_RAM_IFRAM_ADDR;
+use cramium_hal::board::SPIM_FLASH_IFRAM_ADDR;
 use cramium_hal::ifram::IframRange;
 use cramium_hal::iox::Iox;
 use cramium_hal::udma::*;
@@ -18,7 +18,7 @@ impl TestRunner for UdmaTests {
         udma_global.clock_on(PeriphId::from(channel));
         crate::println!("using SPIM channel {:?}", channel);
 
-        let mut ram_spim = unsafe {
+        let mut flash_spim = unsafe {
             Spim::new_with_ifram(
                 channel,
                 25_000_000,
@@ -29,11 +29,11 @@ impl TestRunner for UdmaTests {
                 0,
                 0,
                 None,
-                1024, // this is limited by the page length
-                1024,
+                16, // this is limited by the page length
+                4096,
                 Some(6),
                 None, // initially in default mode
-                IframRange::from_raw_parts(SPIM_RAM_IFRAM_ADDR, SPIM_RAM_IFRAM_ADDR, 4096),
+                IframRange::from_raw_parts(SPIM_FLASH_IFRAM_ADDR, SPIM_FLASH_IFRAM_ADDR, 4096 * 2),
             )
         };
         /*
@@ -55,12 +55,12 @@ impl TestRunner for UdmaTests {
         crate::println!("zero dest");
         let mut dest = [0u8; 256];
         crate::println!("QPI mode");
-        ram_spim.mem_qpi_mode(true);
+        flash_spim.mem_qpi_mode(true);
         crate::println!("read ID");
-        let ram_id = ram_spim.mem_read_id_ram();
-        crate::println!("fake RAM ID: {:x}", ram_id);
+        let ram_id = flash_spim.mem_read_id_flash();
+        crate::println!("FLASH ID: {:x}", ram_id);
         crate::println!("initiate read");
-        if ram_spim.mem_read(0x55A00, &mut dest, false) {
+        if flash_spim.mem_read(0x1000, &mut dest, false) {
             crate::println!("ram_read success!");
         } else {
             crate::println!("ram_read failed");
