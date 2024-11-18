@@ -44,7 +44,9 @@ quanta-test = []
 quirks-pll = []
 aes-zkn = []
 
-default = ["fast-fclk", "aes-zkn"]
+udma = []
+
+default = ["fast-fclk", "aes-zkn", "udma"]
 
 [target.'cfg(not(any(windows, unix)))'.dependencies]
 utralib = { path = "../utralib" }
