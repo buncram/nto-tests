@@ -63,12 +63,17 @@ impl TestRunner for UdmaTests {
         crate::println!("FLASH ID: {:x}", ram_id);
         crate::println!("initiate read");
         if flash_spim.mem_read(0x1000, &mut dest, false) {
-            crate::println!("ram_read success!");
+            crate::println!("rom_read done!");
             for chunk in dest[..32].chunks(4) {
                 crate::println!("{:x}", u32::from_le_bytes(chunk.try_into().unwrap()));
             }
+            for (i, chunk) in dest.chunks(4).enumerate() {
+                let checkval = u32::from_be_bytes(chunk.try_into().unwrap());
+                assert!(checkval == 0xface_8000 + i as u32)
+            }
+            crate::println!("rom_read check passed!");
         } else {
-            crate::println!("ram_read failed");
+            crate::println!("rom_read failed");
         }
     }
 }
