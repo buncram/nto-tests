@@ -32,7 +32,7 @@ impl TestRunner for UdmaTests {
                 1024, // this is limited by the page length
                 1024,
                 Some(6),
-                Some(SpimMode::Quad),
+                None, // initially in default mode
                 IframRange::from_raw_parts(SPIM_RAM_IFRAM_ADDR, SPIM_RAM_IFRAM_ADDR, 4096),
             )
         };
