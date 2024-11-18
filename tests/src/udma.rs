@@ -68,7 +68,7 @@ impl TestRunner for UdmaTests {
                 crate::println!("{:x}", u32::from_le_bytes(chunk.try_into().unwrap()));
             }
             for (i, chunk) in dest.chunks(4).enumerate() {
-                let checkval = u32::from_be_bytes(chunk.try_into().unwrap());
+                let checkval = u32::from_le_bytes(chunk.try_into().unwrap());
                 assert!(checkval == 0xface_8000 + i as u32)
             }
             crate::println!("rom_read check passed!");
