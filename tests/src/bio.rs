@@ -61,7 +61,7 @@ impl TestRunner for BioTests {
         }
 
         // map the BIO ports to GPIO pins
-        let mut iox = cramium_hal::iox::Iox::new(utra::iox::HW_IOX_BASE as *mut u32);
+        let iox = cramium_hal::iox::Iox::new(utra::iox::HW_IOX_BASE as *mut u32);
         iox.set_ports_from_pio_bitmask(0xFFFF_FFFF);
         iox.set_gpio_pullup(cramium_hal::iox::IoxPort::PB, 2, cramium_hal::iox::IoxEnable::Enable);
         iox.set_gpio_pullup(cramium_hal::iox::IoxPort::PB, 3, cramium_hal::iox::IoxEnable::Enable);

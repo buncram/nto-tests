@@ -261,7 +261,7 @@ pub fn setup_uart2() {
     uart.tiny_write_str("udma\r");
     //  UART_RX_A[1] = PD13
     //  UART_RX_A[1] = PD14
-    let mut iox = Iox::new(utra::iox::HW_IOX_BASE as *mut u32);
+    let iox = Iox::new(utra::iox::HW_IOX_BASE as *mut u32);
     iox.set_alternate_function(IoxPort::PD, 13, IoxFunction::AF1);
     iox.set_alternate_function(IoxPort::PD, 14, IoxFunction::AF1);
     // rx as input, with pull-up
@@ -271,7 +271,7 @@ pub fn setup_uart2() {
     iox.set_gpio_dir(IoxPort::PD, 14, IoxDir::Output);
 
     // Set up the UDMA_UART block to the correct baud rate and enable status
-    let mut udma_global = udma::GlobalConfig::new(utra::udma_ctrl::HW_UDMA_CTRL_BASE as *mut u32);
+    let udma_global = udma::GlobalConfig::new(utra::udma_ctrl::HW_UDMA_CTRL_BASE as *mut u32);
     udma_global.clock_on(udma::PeriphId::Uart1);
     udma_global.map_event(
         udma::PeriphId::Uart1,
