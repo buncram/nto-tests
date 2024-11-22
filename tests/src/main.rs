@@ -19,6 +19,7 @@ use utralib::generated::*;
 mod aes;
 mod bio;
 mod debug;
+mod gpio;
 mod init;
 mod irqs;
 mod mbox;
@@ -128,6 +129,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut aes_tests = aes::AesTests::new(false);
     let mut reset_value_test = utils::ResetValue::new(true);
     let mut bio_tests = bio::BioTests::new(true);
+    let mut gpio_tests = gpio::GpioTests::new(true);
     let mut satp_setup = satp::SatpSetup::new(true);
     let mut irq_setup = irqs::IrqSetup::new(true);
     let mut satp_tests = satp::SatpTests::new(true);
@@ -146,18 +148,19 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut udma_tests = udma::UdmaTests::new(false);
+    let mut udma_tests = udma::UdmaTests::new(true);
 
-    let mut tests: [&mut dyn Test; 19] = [
+    let mut tests: [&mut dyn Test; 20] = [
         &mut reset_value_test,
-        // for now, run the UDMA tests first
-        &mut udma_tests,
+        // stuff to run first
+        &mut gpio_tests,
         // quick tests
         &mut aes_tests,
         &mut bio_tests,
         // tests that can only be run on the full chip
         &mut rram_tests,
         &mut mbox_test,
+        &mut udma_tests,
         // core function setup
         &mut satp_setup,
         &mut irq_setup,
