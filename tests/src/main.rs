@@ -13,6 +13,7 @@
 #![no_main]
 #![allow(unreachable_code)] // allow debugging of failures to jump out of the bootloader
 
+use cramium_hal::iox::Iox;
 use utralib::generated::*;
 
 mod aes;
@@ -91,7 +92,7 @@ macro_rules! impl_test {
 
 // TODO:
 //  - add interrupt output to the mbox AHB client
-//  - add a simple mbox test
+//  - add a simple GPIO mapping test
 
 #[export_name = "rust_entry"]
 pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! {
@@ -122,7 +123,9 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     uart.tiny_write_str("booting... 001\r");
     reset_ticktimer();
 
-    let mut aes_tests = aes::AesTests::new(true);
+    setup_io();
+
+    let mut aes_tests = aes::AesTests::new(false);
     let mut reset_value_test = utils::ResetValue::new(true);
     let mut bio_tests = bio::BioTests::new(true);
     let mut satp_setup = satp::SatpSetup::new(true);
@@ -143,7 +146,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut udma_tests = udma::UdmaTests::new(true);
+    let mut udma_tests = udma::UdmaTests::new(false);
 
     let mut tests: [&mut dyn Test; 19] = [
         &mut reset_value_test,
@@ -222,4 +225,11 @@ mod panic_handler {
         report.wfo(utralib::utra::main::DONE_DONE, 1);
         loop {}
     }
+}
+
+fn setup_io() {
+    let iox = Iox::new(utra::iox::HW_IOX_BASE as *mut u32);
+    println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
+    iox.set_ports_from_pio_bitmask(0xFFFF_FFFF);
+    println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
 }
