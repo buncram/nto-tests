@@ -126,21 +126,23 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
 
     setup_io();
 
-    let mut aes_tests = aes::AesTests::new(false);
-    let mut reset_value_test = utils::ResetValue::new(true);
-    let mut bio_tests = bio::BioTests::new(true);
-    let mut gpio_tests = gpio::GpioTests::new(true);
-    let mut satp_setup = satp::SatpSetup::new(true);
-    let mut irq_setup = irqs::IrqSetup::new(true);
-    let mut satp_tests = satp::SatpTests::new(true);
-    let mut irq_tests = irqs::IrqTests::new(true);
-    let mut wfi_tests = irqs::WfiTests::new(true);
-    let mut ram_tests = ramtests::RamTests::new(true);
-    let mut timer0_tests = timer0::Timer0Tests::new(true);
+    let mut aes_tests = aes::AesTests::new(cfg!(feature = "aes-tests"));
+    let mut reset_value_test = utils::ResetValue::new(cfg!(feature = "reset-value-tests"));
+    let mut bio_tests = bio::BioTests::new(cfg!(feature = "bio-tests"));
+    let mut gpio_tests = gpio::GpioTests::new(cfg!(feature = "gpio-tests"));
+    let mut satp_setup = satp::SatpSetup::new(cfg!(feature = "satp-tests"));
+    let mut irq_setup = irqs::IrqSetup::new(cfg!(feature = "irq-tests"));
+    let mut satp_tests = satp::SatpTests::new(cfg!(feature = "satp-tests"));
+    let mut irq_tests = irqs::IrqTests::new(cfg!(feature = "irq-tests"));
+    let mut wfi_tests = irqs::WfiTests::new(cfg!(feature = "wfi-tests"));
+    let mut ram_tests = ramtests::RamTests::new(cfg!(feature = "ram-tests"));
+    let mut timer0_tests = timer0::Timer0Tests::new(cfg!(feature = "timer0-tests"));
 
-    let mut mbox_test = mbox::MboxTests::new(false);
-    let mut rram_tests = rram::RramTests::new(false); // NOTE THIS SHOULD BE ENABLED IN FINAL VERSION
+    let mut mbox_test = mbox::MboxTests::new(cfg!(feature = "mbox-tests"));
+    let mut rram_tests = rram::RramTests::new(cfg!(feature = "rram-tests"));
+    let mut udma_tests = udma::UdmaTests::new(cfg!(feature = "udma-tests"));
 
+    // legacy tests - not run on NTO
     let mut setup_uart2_test = init::SetupUart2Tests::new(false);
     let mut pio_quick_tests = pio::PioQuickTests::new(false);
     let mut byte_strobe_tests = ramtests::ByteStrobeTests::new(false);
@@ -148,17 +150,15 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut udma_tests = udma::UdmaTests::new(true);
-
     let mut tests: [&mut dyn Test; 20] = [
         &mut reset_value_test,
         // stuff to run first
+        &mut rram_tests, // full-chip only, but run early
         &mut gpio_tests,
         // quick tests
         &mut aes_tests,
         &mut bio_tests,
         // tests that can only be run on the full chip
-        &mut rram_tests,
         &mut mbox_test,
         &mut udma_tests,
         // core function setup

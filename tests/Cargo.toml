@@ -37,6 +37,7 @@ sram-margin = []
 debug-irq = []
 bio-mul = ["xous-bio-bdma/bio-mul"]
 
+# legacy tests
 apb-test = []
 quanta-test = []
 
@@ -44,9 +45,21 @@ quanta-test = []
 quirks-pll = []
 aes-zkn = []
 
-udma = []
+# test selections
+aes-tests = ["aes-zkn"]
+reset-value-tests = []
+bio-tests = []
+gpio-tests = []
+satp-tests = []
+irq-tests = []
+wfi-tests = []
+ram-tests = []
+timer0-tests = []
+mbox-tests = []
+rram-tests = []
+udma-tests = []
 
-default = ["fast-fclk", "aes-zkn", "udma"]
+default = ["fast-fclk"]
 
 [target.'cfg(not(any(windows, unix)))'.dependencies]
 utralib = { path = "../utralib" }
