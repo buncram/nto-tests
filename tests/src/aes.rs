@@ -10,11 +10,11 @@
 // Please see the [CERN-OHL- W-2.0] for applicable conditions.
 
 use cipher::{
+    AlgorithmName, BlockBackend, BlockCipher, BlockClosure, BlockDecrypt, BlockEncrypt, BlockSizeUser, Key,
+    KeyInit, KeySizeUser, ParBlocksSizeUser,
     consts::{U1, U16, U32},
     generic_array::GenericArray,
     inout::InOut,
-    AlgorithmName, BlockBackend, BlockCipher, BlockClosure, BlockDecrypt, BlockEncrypt, BlockSizeUser, Key,
-    KeyInit, KeySizeUser, ParBlocksSizeUser,
 };
 
 use crate::*;
@@ -323,22 +323,21 @@ unsafe fn aes_key_schedule_256_even_moar_alt(ck: &[u8]) -> VexKeys256 {
 }
 
 pub fn aes_vexriscv_decrypt_asm_wrapper(key: &VexKeys256, block: &[u8], _rounds: u32) -> [u8; 16] {
+    let mut ct = AlignedBlock { data: [0u8; 16] };
+    ct.data.copy_from_slice(block);
+    let mut pt = AlignedBlock { data: [0u8; 16] };
+
     // safe because our target architecture supports "zkn"
-    unsafe { aes256_vexriscv_decrypt_asm(key, block) }
+    unsafe { aes256_vexriscv_decrypt_asm(key, &ct, &mut pt) };
+    pt.data
 }
 
 #[repr(C, align(16))]
-struct AlignedBlock {
+pub struct AlignedBlock {
     pub data: [u8; 16],
 }
 #[target_feature(enable = "zkn")]
-pub unsafe fn aes256_vexriscv_decrypt_asm(key: &VexKeys256, block: &[u8]) -> [u8; 16] {
-    let mut ct = AlignedBlock { data: [0u8; 16] };
-    ct.data.copy_from_slice(block);
-
-    let mut pt = AlignedBlock { data: [0u8; 16] };
-    let mut pt_ptr = pt.data.as_mut_ptr();
-
+pub unsafe fn aes256_vexriscv_decrypt_asm(key: &VexKeys256, ct: &AlignedBlock, pt: &mut AlignedBlock) {
     #[rustfmt::skip]
     unsafe {
         // a0 - uint8_t     pt [16],
@@ -520,15 +519,11 @@ pub unsafe fn aes256_vexriscv_decrypt_asm(key: &VexKeys256, block: &[u8]) -> [u8
             "sw  a6, 8(a0)",
             "sw  a7, 12(a0)",
 
-            inout("a0") pt_ptr,
+            in("a0") pt.data.as_mut_ptr(),
             in("a1") ct.data.as_ptr(),
             in("a2") key.as_ptr(),
         );
     };
-    let pt_slice = unsafe { core::slice::from_raw_parts(pt_ptr, pt.data.len()) };
-    let mut out = [0u8; 16];
-    out.copy_from_slice(pt_slice);
-    out
 }
 
 /// AES-256 round keys
