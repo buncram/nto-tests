@@ -73,7 +73,7 @@ pub fn rram_tests_corners() -> usize {
         }
     }
 
-    crate::println!("Corners: passing {} of {}", passing, TOTAL_TESTS);
+    crate::println!("Corners: passing {} of {}", passing, CORNERS_TOTAL);
     passing
 }
 
