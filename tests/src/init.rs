@@ -24,7 +24,7 @@ impl TestRunner for SetupUart2Tests {
 
 // returns the actual per_clk
 #[cfg(not(feature = "quirks-pll"))]
-unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
+pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
     use utra::sysctrl;
     let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
     /*
