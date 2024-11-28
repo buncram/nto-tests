@@ -102,14 +102,6 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
 
     crate::println!("pllq: 0x{:x}, pllmn: 0x{:x}, n_frac: 0x{:x}", pllq, pllmn, n_frac);
 
-    daric_cgu.add(sysctrl::SFR_CGUSEL1.offset()).write_volatile(1); // 0: RC, 1: XTAL
-    daric_cgu.add(sysctrl::SFR_CGUFSCR.offset()).write_volatile(48); // external crystal is 48MHz
-    daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
-
-    if freq_hz < 1_000_000 {
-        daric_cgu.add(sysctrl::SFR_IPCOSC.offset()).write_volatile(freq_hz);
-        daric_cgu.add(sysctrl::SFR_IPCARIPFLOW.offset()).write_volatile(0x32); // commit, must write 32
-    }
     // switch to OSC
     daric_cgu.add(sysctrl::SFR_CGUSEL0.offset()).write_volatile(0); // clktop sel, 0:clksys, 1:clkpll0
     daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32); // commit
@@ -217,21 +209,6 @@ fn fsfreq_to_hz(fs_freq: u32) -> u32 { (fs_freq * (48_000_000 / 32)) / 1_000_000
 fn fsfreq_to_hz_32(fs_freq: u32) -> u32 { (fs_freq * (32_000_000 / 32)) / 1_000_000 }
 
 pub unsafe fn early_init() {
-    #[cfg(not(feature = "quirks-pll"))]
-    {
-        // This block is MANDATORY for any chip stability in real silicon, as the initial
-        // clocks are too unstable to do anything otherwise.
-        let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
-        daric_cgu.add(sysctrl::SFR_CGUSEL1.offset()).write_volatile(1); // 0: RC, 1: XTAL
-        daric_cgu.add(sysctrl::SFR_CGUFSCR.offset()).write_volatile(48); // external crystal is 48MHz
-
-        daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
-
-        let duart = utra::duart::HW_DUART_BASE as *mut u32;
-        duart.add(utra::duart::SFR_CR.offset()).write_volatile(0);
-        duart.add(utra::duart::SFR_ETUC.offset()).write_volatile(24);
-        duart.add(utra::duart::SFR_CR.offset()).write_volatile(1);
-    }
     // this block is mandatory in all cases to get clocks set into some consistent, expected mode
     {
         let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
