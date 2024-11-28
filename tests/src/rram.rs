@@ -15,6 +15,8 @@ use xous_pl230::*;
 use crate::utils::*;
 use crate::*;
 
+const ALIGNMENT: usize = 32;
+
 const QUICK_TESTS: usize = 8;
 const CORNER_TESTS: usize = 12;
 const CORNERS: usize = 4;
@@ -24,7 +26,10 @@ const TOTAL_TESTS: usize = QUICK_TESTS + CORNERS_TOTAL;
 crate::impl_test!(RramTests, "RRAM", TOTAL_TESTS);
 
 impl TestRunner for RramTests {
-    fn run(&mut self) { self.passing_tests += rram_tests_early(); }
+    fn run(&mut self) {
+        self.passing_tests += rram_tests_early();
+        self.passing_tests += rram_tests_corners();
+    }
 }
 
 pub fn rram_tests_corners() -> usize {
@@ -68,7 +73,7 @@ pub fn rram_tests_corners() -> usize {
         }
     }
 
-    crate::println!("Corners: passing {} of {}", passing, QUICK_TESTS);
+    crate::println!("Corners: passing {} of {}", passing, TOTAL_TESTS);
     passing
 }
 
@@ -189,8 +194,6 @@ pub mod rrc {
     pub const HW_RRC_BASE: usize = 0x4000_0000;
 }
 
-const ALIGNMENT: usize = 32;
-
 #[repr(align(4))]
 struct AlignedBuffer([u8; ALIGNMENT]);
 impl AlignedBuffer {
@@ -230,15 +233,18 @@ impl Reram {
     pub unsafe fn write_u32_aligned(&mut self, addr: usize, data: &[u32]) {
         assert!(addr % 0x20 == 0, "unaligned destination address!");
         assert!(data.len() % 8 == 0, "unaligned source data!");
+        crate::print!("@ {:x} > ", addr);
         for (outer, d) in data.chunks_exact(8).enumerate() {
             // write the data to the buffer
             for (inner, &datum) in d.iter().enumerate() {
+                crate::print!(" {:x}", datum);
                 self.array
                     .as_mut_ptr()
                     .add(addr / core::mem::size_of::<u32>() + outer * 8 + inner)
                     .write_volatile(datum);
                 core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
             }
+            crate::println!("");
 
             self.csr.wo(rrc::RRC_CR, rrc::RRC_CR_WRITE_CMD);
             self.array
@@ -264,7 +270,7 @@ impl Reram {
         // ragged start
         let start_len = ALIGNMENT - (offset % ALIGNMENT);
         if start_len != 0 {
-            let start_offset = offset & !(offset - 1);
+            let start_offset = offset & !(ALIGNMENT - 1);
             let dest_slice = unsafe {
                 core::slice::from_raw_parts(
                     (start_offset + utralib::HW_RERAM_MEM) as *const u8,
