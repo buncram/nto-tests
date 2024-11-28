@@ -16,6 +16,7 @@ use crate::*;
 pub fn report_api(d: u32) {
     let mut report = CSR::new(utra::csrtest::HW_CSRTEST_BASE as *mut u32);
     report.wo(utra::csrtest::WTEST, d);
+    crate::println!("Report: {:x}", d);
 
     // let mut uart = debug::Uart {};
     // uart.print_hex_word(d);
