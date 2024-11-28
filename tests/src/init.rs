@@ -23,7 +23,8 @@ impl TestRunner for SetupUart2Tests {
 }
 
 // returns the actual per_clk
-pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
+#[cfg(not(feature = "quirks-pll"))]
+unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
     use utra::sysctrl;
     let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
     /*
@@ -52,7 +53,9 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
     let fclk_div =
         if (1 << final_div.ilog2()) != final_div { 1 << (final_div.ilog2() + 1) } else { final_div };
     let vco_actual: u32 = fclk_div * freq_hz;
-
+    if vco_actual < 1_000_000_000 || vco_actual > 3_000_000_000 {
+        crate::println!("Warning: VCO out of range: {}", vco_actual);
+    }
     const TARGET_PERCLK_HZ: u32 = 100_000_000; // 100 MHz
     let perclk_np_div: u32 = vco_actual / TARGET_PERCLK_HZ;
     let perclk_div = if (1 << perclk_np_div.ilog2()) != perclk_np_div {
@@ -66,7 +69,15 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
     let pll_q1_0 = (1 << (ilog2_fdiv / 2 + ilog2_fdiv % 2)) - 1;
     let pll_q0_1 = (1 << (ilog2_pdiv / 2)) - 1;
     let pll_q1_1 = (1 << (ilog2_pdiv / 2 + ilog2_pdiv % 2)) - 1;
-
+    if pll_q0_0 > 7 || pll_q0_1 > 7 || pll_q1_0 > 7 || pll_q1_1 > 7 {
+        crate::println!(
+            "Warning: PLLQ out of range: 0_0:{} 1_0:{} 0_1:{} 1_1:{}",
+            pll_q0_0,
+            pll_q1_0,
+            pll_q0_1,
+            pll_q1_1
+        );
+    }
     // this is the pllq value
     let pllq = (pll_q0_0 & 7) | ((pll_q1_0 & 7) << 4) | ((pll_q0_1 & 7) << 8) | ((pll_q1_1 & 7) << 12);
 
@@ -78,9 +89,15 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
     assert!(fref_hz == 8_000_000);
 
     let ni = vco_actual / fref_hz;
+    if ni >= 4096 || ni < 8 {
+        crate::println!("Warning: ni out of range: {}", ni);
+    }
     let pllmn = (PREDIV_M << 12) | ni & 0xFFF; // m is set to PREDIV_M, lower 12 bits is nf
     let frac_n = ((vco_actual as f32 / fref_hz as f32) - ni as f32).max(0 as f32);
     let pllf: u32 = (frac_n * ((1 << 24) as f32)) as u32;
+    if pllf >= 1 << 24 {
+        crate::println!("Warning nf out of range: 0x{:x}", pllf);
+    }
     let n_frac = if pllf != 0 { pllf | 1 << 24 } else { 0 }; // set the frac enable bit if needed
 
     crate::println!("pllq: 0x{:x}, pllmn: 0x{:x}, n_frac: 0x{:x}", pllq, pllmn, n_frac);
@@ -110,7 +127,7 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         for _ in 0..1024 {
             unsafe { core::arch::asm!("nop") };
         }
-        // crate::println!("PLL delay 1");
+        crate::println!("PLL delay 1");
 
         daric_cgu.add(sysctrl::SFR_IPCPLLMN.offset()).write_volatile(pllmn); // 0x1F598;
         daric_cgu.add(sysctrl::SFR_IPCPLLF.offset()).write_volatile(n_frac); // 0x2812
@@ -132,7 +149,7 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         for _ in 0..1024 {
             unsafe { core::arch::asm!("nop") };
         }
-        // crate::println!("PLL delay 2");
+        crate::println!("PLL delay 2");
 
         daric_cgu.add(sysctrl::SFR_CGUSEL0.offset()).write_volatile(1); // clktop sel, 0:clksys, 1:clkpll0
         daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32); // commit
@@ -140,7 +157,7 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         for _ in 0..1024 {
             unsafe { core::arch::asm!("nop") };
         }
-        // crate::println!("PLL delay 3");
+        crate::println!("PLL delay 3");
 
         crate::println!("fsvalid: {}", daric_cgu.add(sysctrl::SFR_CGUFSVLD.offset()).read_volatile());
         let _cgufsfreq0 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ0.offset()).read_volatile();
@@ -205,28 +222,31 @@ pub unsafe fn early_init() {
         // This block is MANDATORY for any chip stability in real silicon, as the initial
         // clocks are too unstable to do anything otherwise.
         let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
-
         daric_cgu.add(sysctrl::SFR_CGUSEL1.offset()).write_volatile(1); // 0: RC, 1: XTAL
         daric_cgu.add(sysctrl::SFR_CGUFSCR.offset()).write_volatile(48); // external crystal is 48MHz
-        daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
-        daric_cgu.add(utra::sysctrl::SFR_IPCOSC.offset()).write_volatile(16_000_000);
-        daric_cgu.add(utra::sysctrl::SFR_IPCARIPFLOW.offset()).write_volatile(0x32);
 
-        daric_cgu.add(utra::sysctrl::SFR_CGUSEL0.offset()).write_volatile(0);
-        daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
+        daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
+
+        let duart = utra::duart::HW_DUART_BASE as *mut u32;
+        duart.add(utra::duart::SFR_CR.offset()).write_volatile(0);
+        duart.add(utra::duart::SFR_ETUC.offset()).write_volatile(24);
+        duart.add(utra::duart::SFR_CR.offset()).write_volatile(1);
     }
     // this block is mandatory in all cases to get clocks set into some consistent, expected mode
     {
         let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
+        // conservative dividers
         daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_0.offset()).write_volatile(0x7f7f);
         daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_1.offset()).write_volatile(0x7f7f);
-        daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_2.offset()).write_volatile(0x3f3f);
-        daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_3.offset()).write_volatile(0x1f1f);
-        daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_4.offset()).write_volatile(0x0f0f);
+        daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_2.offset()).write_volatile(0x3f7f);
+        daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_3.offset()).write_volatile(0x1f3f);
+        daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_4.offset()).write_volatile(0x0f1f);
+        // ungate all clocks
         daric_cgu.add(utra::sysctrl::SFR_ACLKGR.offset()).write_volatile(0xFF);
         daric_cgu.add(utra::sysctrl::SFR_HCLKGR.offset()).write_volatile(0xFF);
         daric_cgu.add(utra::sysctrl::SFR_ICLKGR.offset()).write_volatile(0xFF);
         daric_cgu.add(utra::sysctrl::SFR_PCLKGR.offset()).write_volatile(0xFF);
+        // commit clocks
         daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
     }
     // enable DUART
