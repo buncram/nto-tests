@@ -15,16 +15,66 @@ use xous_pl230::*;
 use crate::utils::*;
 use crate::*;
 
-const TOTAL_TESTS: usize = 8;
+const QUICK_TESTS: usize = 8;
+const CORNER_TESTS: usize = 12;
+const CORNERS: usize = 4;
+const CORNERS_TOTAL: usize = CORNER_TESTS * CORNERS * size_of::<u32>();
+
+const TOTAL_TESTS: usize = QUICK_TESTS + CORNERS_TOTAL;
 crate::impl_test!(RramTests, "RRAM", TOTAL_TESTS);
 
 impl TestRunner for RramTests {
     fn run(&mut self) { self.passing_tests += rram_tests_early(); }
 }
 
+pub fn rram_tests_corners() -> usize {
+    let mut reram = Reram::new();
+    let mut test = [0u32; CORNER_TESTS];
+    let mut seed = 0xe692_b0f6;
+    let mut passing = 0;
+    let byte_offsets = [
+        // aligned mid-write
+        0x20_0000,
+        // end cap
+        0x40_0000 - CORNER_TESTS * size_of::<u32>(),
+        // beginning
+        0x0,
+        // unaligned
+        0x12_3455,
+    ];
+
+    for offset in byte_offsets {
+        for d in test.iter_mut() {
+            seed = crate::lfsr_next_u32(seed);
+            *d = seed;
+        }
+        // safety: safe because u8 can align into the u32 storage, and all values can be represented.
+        let data =
+            unsafe { core::slice::from_raw_parts(test.as_ptr() as *const u8, test.len() * size_of::<u32>()) };
+        reram.write_slice(offset, data);
+        cache_flush();
+        let rram_check = unsafe {
+            core::slice::from_raw_parts(
+                (offset + utralib::HW_RERAM_MEM) as *const u8,
+                test.len() * size_of::<u32>(),
+            )
+        };
+        for (i, (&s, &d)) in rram_check.iter().zip(data.iter()).enumerate() {
+            if s == d {
+                passing += 1;
+            } else {
+                crate::println!("Err: s {:x} -> d {:x} @ {:x}", s, d, offset + utralib::HW_RERAM_MEM + i);
+            }
+        }
+    }
+
+    crate::println!("Corners: passing {} of {}", passing, QUICK_TESTS);
+    passing
+}
+
 pub fn rram_tests_early() -> usize {
     let mut reram = Reram::new();
-    let mut rbk = [0u32; TOTAL_TESTS];
+    let mut rbk = [0u32; QUICK_TESTS];
     let byte_offset = 0x10_0000;
     // readback
     {
@@ -40,7 +90,7 @@ pub fn rram_tests_early() -> usize {
     core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
     crate::println!("RRAM writing...");
-    let test_data: [u32; TOTAL_TESTS] = [
+    let test_data: [u32; QUICK_TESTS] = [
         0xeeee_eeee,
         0xbabe_600d,
         0x3141_5926,
@@ -54,22 +104,7 @@ pub fn rram_tests_early() -> usize {
     unsafe {
         reram.write_u32_aligned(byte_offset, &test_data);
     }
-    unsafe {
-        // cache flush
-        #[rustfmt::skip]
-        core::arch::asm!(
-            ".word 0x500F",
-            "nop",
-            "nop",
-            "nop",
-            "nop",
-            "fence",
-            "nop",
-            "nop",
-            "nop",
-            "nop",
-        );
-    }
+    cache_flush();
     let mut passing = 0;
     {
         let rslice = &reram.read_slice()[byte_offset / core::mem::size_of::<u32>()
@@ -82,7 +117,7 @@ pub fn rram_tests_early() -> usize {
             }
         }
     }
-    crate::println!("Passing {} of {}", passing, TOTAL_TESTS);
+    crate::println!("Base: passing {} of {}", passing, QUICK_TESTS);
     passing
 }
 
@@ -153,6 +188,20 @@ pub mod rrc {
     pub const RRC_SR: utralib::Register = utralib::Register::new(2, 0xffff_ffff);
     pub const HW_RRC_BASE: usize = 0x4000_0000;
 }
+
+const ALIGNMENT: usize = 32;
+
+#[repr(align(4))]
+struct AlignedBuffer([u8; ALIGNMENT]);
+impl AlignedBuffer {
+    pub fn as_slice_u32(&self) -> &[u32] {
+        // safety: this is safe because the #repr(align) ensures that our alignment is correct,
+        // and the length of the internal data structure is set correctly by design. Furthermore,
+        // all values in both the source and destination transmutation are representable and valid.
+        unsafe { core::slice::from_raw_parts(self.0.as_ptr() as *const u32, self.0.len() / 4) }
+    }
+}
+
 pub struct Reram {
     pl230: xous_pl230::Pl230,
     csr: CSR<u32>,
@@ -207,6 +256,62 @@ impl Reram {
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
     }
 
+    /// This is a general unaligned write primitive for the RRAM that can handle any length
+    /// slice and alignment of data.
+    pub fn write_slice(&mut self, offset: usize, data: &[u8]) {
+        let mut buffer = AlignedBuffer([0u8; ALIGNMENT]);
+
+        // ragged start
+        let start_len = ALIGNMENT - (offset % ALIGNMENT);
+        if start_len != 0 {
+            let start_offset = offset & !(offset - 1);
+            let dest_slice = unsafe {
+                core::slice::from_raw_parts(
+                    (start_offset + utralib::HW_RERAM_MEM) as *const u8,
+                    buffer.0.len(),
+                )
+            };
+            // populate from old data first
+            buffer.0.copy_from_slice(&dest_slice);
+            buffer.0[offset % ALIGNMENT..].copy_from_slice(&data[..start_len]);
+            // safe because alignment and buffer sizes are guaranteed
+            unsafe {
+                self.write_u32_aligned(start_offset, buffer.as_slice_u32());
+            }
+        }
+
+        // aligned middle & end
+        let mut cur_offset = offset + start_len;
+        if data.len() - start_len > 0 {
+            for chunk in data[start_len..].chunks(buffer.0.len()) {
+                // full chunk
+                if chunk.len() == buffer.0.len() {
+                    buffer.0.copy_from_slice(&chunk);
+                    // safe because alignment and buffer sizes are guaranteed
+                    unsafe {
+                        self.write_u32_aligned(cur_offset, &buffer.as_slice_u32());
+                    }
+                } else {
+                    let dest_slice = unsafe {
+                        core::slice::from_raw_parts(
+                            (cur_offset + utralib::HW_RERAM_MEM) as *const u8,
+                            buffer.0.len(),
+                        )
+                    };
+                    // read in the destination full contents
+                    buffer.0.copy_from_slice(&dest_slice);
+                    // now overwrite the "ragged end"
+                    buffer.0[..chunk.len()].copy_from_slice(&chunk);
+                    // safe because alignment and buffer sizes are guaranteed
+                    unsafe {
+                        self.write_u32_aligned(cur_offset, &buffer.as_slice_u32());
+                    }
+                }
+                cur_offset += chunk.len();
+            }
+        }
+    }
+
     pub unsafe fn write_u32_aligned_dma(&mut self, _addr: usize, data: &[u32]) {
         //assert!(addr % 0x20 == 0, "unaligned destination address!");
         //assert!(data.len() % 8 == 0, "unaligned source data!");
@@ -254,5 +359,25 @@ impl Reram {
         self.array[addr / core::mem::size_of::<u32>()] = rrc::RRC_LOAD_BUFFER;
         self.array[addr / core::mem::size_of::<u32>()] = rrc::RRC_WRITE_BUFFER;
         self.csr.wo(rrc::RRC_CR, rrc::RRC_CR_NORMAL); */
+    }
+}
+
+#[inline(always)]
+fn cache_flush() {
+    unsafe {
+        // cache flush
+        #[rustfmt::skip]
+        core::arch::asm!(
+            ".word 0x500F",
+            "nop",
+            "nop",
+            "nop",
+            "nop",
+            "fence",
+            "nop",
+            "nop",
+            "nop",
+            "nop",
+        );
     }
 }
