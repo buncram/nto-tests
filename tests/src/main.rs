@@ -154,7 +154,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut tests: [&mut dyn Test; 20] = [
         &mut reset_value_test,
         // stuff to run first
-        &mut rram_tests, // full-chip only, but run early
+        &mut rram_tests, // full-chip only, but run early - this isn't passing right now
         &mut gpio_tests,
         // quick tests
         &mut aes_tests,
