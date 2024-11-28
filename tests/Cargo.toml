@@ -22,7 +22,9 @@ xous-pl230 = { path = "../../xous-core/libs/xous-pl230", default-features = fals
     "cramium-soc",
     "baremetal",
 ] }
-cramium-hal = { path = "../../xous-core/libs/cramium-hal" }
+cramium-hal = { path = "../../xous-core/libs/cramium-hal", features = [
+    "udma-stress-test",
+] }
 pio-proc = "0.2.2"
 pio = "0.2.1"
 # Used by AES tests
