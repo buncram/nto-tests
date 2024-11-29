@@ -38,6 +38,7 @@ fast-fclk = []                      # 800 MHz FCLK
 sram-margin = []
 debug-irq = []
 bio-mul = ["xous-bio-bdma/bio-mul"]
+coreuser-compression = []           # this feature is not used
 
 # legacy tests
 apb-test = []

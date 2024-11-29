@@ -9,6 +9,7 @@
 // MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE.
 // Please see the [CERN-OHL- W-2.0] for applicable conditions.
 
+#[cfg(feature = "coreuser-compression")]
 use utralib::generated::*;
 
 use crate::*;
@@ -225,64 +226,66 @@ pub fn to_user_mode() {
 
 pub fn satp_test() {
     report_api(0x5a1d_0000);
+    #[cfg(feature = "coreuser-compression")]
+    {
+        let mut coreuser = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
+        // first, clear the ASID table to 0
+        for asid in 0..512 {
+            coreuser.wo(
+                utra::coreuser::SET_ASID,
+                coreuser.ms(utra::coreuser::SET_ASID_ASID, asid)
+                    | coreuser.ms(utra::coreuser::SET_ASID_TRUSTED, 0),
+            );
+        }
 
-    let mut coreuser = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
-    // first, clear the ASID table to 0
-    for asid in 0..512 {
+        // set some ASIDs to trusted. Values picked to somewhat challenge the decoding
+        let trusted_asids = [1, 0x17, 0x18, 0x52, 0x57, 0x5A, 0x5F, 0x60, 0x61, 0x62, 0x116, 0x18F];
+        for asid in trusted_asids {
+            coreuser.wo(
+                utra::coreuser::SET_ASID,
+                coreuser.ms(utra::coreuser::SET_ASID_ASID, asid)
+                    | coreuser.ms(utra::coreuser::SET_ASID_TRUSTED, 1),
+            );
+        }
+        // readback of table
+        /* // this is too slow with the Daric UART model, but uncomment it later when running on real hardware
+        for asid in 0..512 {
+            coreuser.wfo(utra::coreuser::GET_ASID_ADDR_ASID, asid);
+            report_api(
+                coreuser.rf(utra::coreuser::GET_ASID_VALUE_VALUE) << 16 | asid
+            );
+        } */
+
+        // setup window on our root page. Narrowly define it to *just* one page.
+        coreuser.wfo(utra::coreuser::WINDOW_AH_PPN, (ROOT_PT_PA >> 12) as u32);
+        coreuser.wfo(utra::coreuser::WINDOW_AL_PPN, (ROOT_PT_PA >> 12) as u32);
+
+        // turn on the coreuser computation
+        coreuser.wo(
+            utra::coreuser::CONTROL,
+            coreuser.ms(utra::coreuser::CONTROL_ASID, 1)
+                | coreuser.ms(utra::coreuser::CONTROL_ENABLE, 1)
+                | coreuser.ms(utra::coreuser::CONTROL_PPN_A, 1),
+        );
+
+        // turn off updates
+        coreuser.wo(utra::coreuser::PROTECT, 1);
+
+        // tries to "turn off" protect, but it should do nothing
+        coreuser.wo(utra::coreuser::PROTECT, 0);
+        // tamper with asid & ppn values, should not change result
+        // add `2` to the trusted list (should not work)
         coreuser.wo(
             utra::coreuser::SET_ASID,
-            coreuser.ms(utra::coreuser::SET_ASID_ASID, asid)
-                | coreuser.ms(utra::coreuser::SET_ASID_TRUSTED, 0),
+            coreuser.ms(utra::coreuser::SET_ASID_ASID, 2) | coreuser.ms(utra::coreuser::SET_ASID_TRUSTED, 1),
         );
-    }
-
-    // set some ASIDs to trusted. Values picked to somewhat challenge the decoding
-    let trusted_asids = [1, 0x17, 0x18, 0x52, 0x57, 0x5A, 0x5F, 0x60, 0x61, 0x62, 0x116, 0x18F];
-    for asid in trusted_asids {
-        coreuser.wo(
-            utra::coreuser::SET_ASID,
-            coreuser.ms(utra::coreuser::SET_ASID_ASID, asid)
-                | coreuser.ms(utra::coreuser::SET_ASID_TRUSTED, 1),
-        );
-    }
-    // readback of table
-    /* // this is too slow with the Daric UART model, but uncomment it later when running on real hardware
-    for asid in 0..512 {
-        coreuser.wfo(utra::coreuser::GET_ASID_ADDR_ASID, asid);
-        report_api(
-            coreuser.rf(utra::coreuser::GET_ASID_VALUE_VALUE) << 16 | asid
-        );
-    } */
-
-    // setup window on our root page. Narrowly define it to *just* one page.
-    coreuser.wfo(utra::coreuser::WINDOW_AH_PPN, (ROOT_PT_PA >> 12) as u32);
-    coreuser.wfo(utra::coreuser::WINDOW_AL_PPN, (ROOT_PT_PA >> 12) as u32);
-
-    // turn on the coreuser computation
-    coreuser.wo(
-        utra::coreuser::CONTROL,
-        coreuser.ms(utra::coreuser::CONTROL_ASID, 1)
-            | coreuser.ms(utra::coreuser::CONTROL_ENABLE, 1)
-            | coreuser.ms(utra::coreuser::CONTROL_PPN_A, 1),
-    );
-
-    // turn off updates
-    coreuser.wo(utra::coreuser::PROTECT, 1);
-
-    // tries to "turn off" protect, but it should do nothing
-    coreuser.wo(utra::coreuser::PROTECT, 0);
-    // tamper with asid & ppn values, should not change result
-    // add `2` to the trusted list (should not work)
-    coreuser.wo(
-        utra::coreuser::SET_ASID,
-        coreuser.ms(utra::coreuser::SET_ASID_ASID, 2) | coreuser.ms(utra::coreuser::SET_ASID_TRUSTED, 1),
-    );
-    coreuser.wfo(utra::coreuser::WINDOW_AH_PPN, 0xface as u32);
-    coreuser.wfo(utra::coreuser::WINDOW_AL_PPN, 0xdead as u32);
-    // partial readback of table; `2` should not be trusted
-    for asid in 0..4 {
-        coreuser.wfo(utra::coreuser::GET_ASID_ADDR_ASID, asid);
-        report_api(coreuser.rf(utra::coreuser::GET_ASID_VALUE_VALUE) << 16 | asid);
+        coreuser.wfo(utra::coreuser::WINDOW_AH_PPN, 0xface as u32);
+        coreuser.wfo(utra::coreuser::WINDOW_AL_PPN, 0xdead as u32);
+        // partial readback of table; `2` should not be trusted
+        for asid in 0..4 {
+            coreuser.wfo(utra::coreuser::GET_ASID_ADDR_ASID, asid);
+            report_api(coreuser.rf(utra::coreuser::GET_ASID_VALUE_VALUE) << 16 | asid);
+        }
     }
 
     // now try changing the SATP around and see that the coreuser value updates
