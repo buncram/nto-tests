@@ -28,11 +28,17 @@ crate::impl_test!(RramTests, "RRAM", TOTAL_TESTS);
 impl TestRunner for RramTests {
     fn run(&mut self) {
         self.passing_tests += rram_tests_early();
-        self.passing_tests += rram_tests_corners();
+        self.passing_tests += rram_tests_corners(false);
     }
 }
 
-pub fn rram_tests_corners() -> usize {
+/// A test runner just for verifying that RRAM was not disturbed.
+crate::impl_test!(RramDisturbTests, "RRAM Disturb", CORNERS_TOTAL);
+impl TestRunner for RramDisturbTests {
+    fn run(&mut self) { self.passing_tests += rram_tests_corners(true); }
+}
+
+pub fn rram_tests_corners(verify_only: bool) -> usize {
     let mut reram = Reram::new();
     let mut test = [0u32; CORNER_TESTS];
     let mut seed = 0xe692_b0f6;
@@ -56,8 +62,11 @@ pub fn rram_tests_corners() -> usize {
         // safety: safe because u8 can align into the u32 storage, and all values can be represented.
         let data =
             unsafe { core::slice::from_raw_parts(test.as_ptr() as *const u8, test.len() * size_of::<u32>()) };
-        reram.write_slice(offset, data);
-        cache_flush();
+        // if just verifying that the write succeeded, skip the write
+        if !verify_only {
+            reram.write_slice(offset, data);
+            cache_flush();
+        }
         let rram_check = unsafe {
             core::slice::from_raw_parts(
                 (offset + utralib::HW_RERAM_MEM) as *const u8,
@@ -73,7 +82,12 @@ pub fn rram_tests_corners() -> usize {
         }
     }
 
-    crate::println!("Corners: passing {} of {}", passing, CORNERS_TOTAL);
+    crate::println!(
+        "Corners {}: passing {} of {}",
+        if verify_only { "reverify" } else { "write" },
+        passing,
+        CORNERS_TOTAL
+    );
     passing
 }
 
