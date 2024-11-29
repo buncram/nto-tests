@@ -32,8 +32,8 @@ impl TestRunner for RramTests {
     }
 }
 
-/// A test runner just for verifying that RRAM was not disturbed.
 crate::impl_test!(RramDisturbTests, "RRAM Disturb", CORNERS_TOTAL);
+/// A test runner just for verifying that RRAM was not disturbed.
 impl TestRunner for RramDisturbTests {
     fn run(&mut self) { self.passing_tests += rram_tests_corners(true); }
 }
