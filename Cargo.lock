@@ -1020,7 +1020,6 @@ dependencies = [
  "pio-proc",
  "utralib",
  "xous",
- "xous-pio",
 ]
 
 [[package]]
