@@ -12,11 +12,11 @@ xous-bio-bdma = { path = "../../xous-core/libs/xous-bio-bdma", default-features 
     "cramium-soc",
     "baremetal",
 ] }
-xous-pio = { path = "../../xous-core/libs/xous-pio", default-features = false, features = [
-    "tests",
-    "cramium-soc",
-    "baremetal",
-] }
+# xous-pio = { path = "../../xous-core/libs/xous-pio", default-features = false, features = [
+#     "tests",
+#     "cramium-soc",
+#     "baremetal",
+# ] }
 xous-pl230 = { path = "../../xous-core/libs/xous-pl230", default-features = false, features = [
     "tests",
     "cramium-soc",
@@ -40,6 +40,7 @@ sram-margin = []
 debug-irq = []
 bio-mul = ["xous-bio-bdma/bio-mul"]
 coreuser-compression = []           # this feature is not used
+pio = []
 
 # legacy tests
 apb-test = []

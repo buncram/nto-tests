@@ -739,7 +739,6 @@ dependencies = [
  "pio-proc",
  "utralib",
  "xous-bio-bdma",
- "xous-pio",
  "xous-pl230",
  "xous-riscv",
  "zeroize",
@@ -994,17 +993,6 @@ name = "xous-bio-bdma"
 version = "0.1.0"
 dependencies = [
  "log",
- "utralib",
- "xous",
-]
-
-[[package]]
-name = "xous-pio"
-version = "0.1.0"
-dependencies = [
- "log",
- "pio",
- "pio-proc",
  "utralib",
  "xous",
 ]

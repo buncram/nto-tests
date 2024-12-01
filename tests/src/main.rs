@@ -23,6 +23,7 @@ mod gpio;
 mod init;
 mod irqs;
 mod mbox;
+#[cfg(feature = "pio")]
 mod pio;
 mod pl230;
 mod ramtests;
@@ -36,6 +37,7 @@ mod utils;
 mod asm;
 
 pub use init::*;
+#[cfg(feature = "pio")]
 pub use pio::*;
 pub use ramtests::*;
 pub use rram::*;
@@ -146,13 +148,14 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
 
     // legacy tests - not run on NTO
     let mut setup_uart2_test = init::SetupUart2Tests::new(false);
+    #[cfg(feature = "pio")]
     let mut pio_quick_tests = pio::PioQuickTests::new(false);
     let mut byte_strobe_tests = ramtests::ByteStrobeTests::new(false);
     let mut xip_tests = ramtests::XipTests::new(false);
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut tests: [&mut dyn Test; 21] = [
+    let mut tests: [&mut dyn Test; 20] = [
         &mut reset_value_test,
         // stuff to run first
         &mut rram_tests, // full-chip only, but run early - this isn't passing right now
@@ -177,6 +180,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
         &mut setup_uart2_test,
         &mut byte_strobe_tests,
         &mut ram_tests,
+        #[cfg(feature = "pio")]
         &mut pio_quick_tests,
         &mut xip_tests,
         &mut sce_dma_tests,
