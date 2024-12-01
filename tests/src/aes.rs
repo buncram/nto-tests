@@ -65,6 +65,7 @@ fn u8_to_hex_ascii(byte: u8) -> [u8; 2] {
     [HEX_DIGITS[high_nibble as usize], HEX_DIGITS[low_nibble as usize]]
 }
 
+#[repr(align(32))]
 struct AesEcbTest<'a> {
     key: &'a [u8],
     plaintext: &'a [u8],
@@ -231,14 +232,23 @@ fn aes_key_schedule_256_alt(ck: &[u8]) -> VexKeys256 {
     rk_u32
 }
 
+#[repr(align(32))]
+#[derive(Default)]
+struct AlignedCk {
+    d: [u8; 32],
+}
+
 fn aes_key_schedule_256_even_moar_alt_wrapper(ck: &[u8]) -> VexKeys256 {
+    let mut ck_a = AlignedCk::default();
+    ck_a.d.copy_from_slice(&ck);
+    let mut rk: VexKeys256 = [0; 60];
     // Safety: safe because our target has the "zkn" RV32 extensions.
-    unsafe { aes_key_schedule_256_even_moar_alt(ck) }
+    unsafe { aes_key_schedule_256_even_moar_alt(&mut rk, &ck_a.d) };
+    rk
 }
 
 #[target_feature(enable = "zkn")]
-unsafe fn aes_key_schedule_256_even_moar_alt(ck: &[u8]) -> VexKeys256 {
-    let mut rk: VexKeys256 = [0; 60];
+unsafe fn aes_key_schedule_256_even_moar_alt(rk: &mut VexKeys256, ck: &[u8]) {
     #[rustfmt::skip]
     unsafe {
         // a0 - uint32_t rk [AES_256_RK_WORDS]
@@ -319,7 +329,6 @@ unsafe fn aes_key_schedule_256_even_moar_alt(ck: &[u8]) -> VexKeys256 {
             in("a1") ck.as_ptr(),
         );
     };
-    rk
 }
 
 pub fn aes_vexriscv_decrypt_asm_wrapper(key: &VexKeys256, block: &[u8], _rounds: u32) -> [u8; 16] {
@@ -589,12 +598,19 @@ fn set_encrypt_key_inner_256(user_key: &[u8], swap_final: bool) -> VexKeys256 {
 }
 
 fn aes256_dec_key_schedule_asm_wrapper(user_key: &[u8]) -> VexKeys256 {
-    unsafe { aes256_dec_key_schedule_asm(user_key) }
+    let mut rk: VexKeys256 = [0; 60];
+    let mut uk_a = AlignedCk::default();
+    uk_a.d.copy_from_slice(&user_key);
+
+    unsafe {
+        aes_key_schedule_256_even_moar_alt(&mut rk, &uk_a.d);
+    }
+    unsafe { aes256_dec_key_schedule_asm(&mut rk, &uk_a.d) };
+    rk
 }
 
 #[target_feature(enable = "zkn")]
-unsafe fn aes256_dec_key_schedule_asm(user_key: &[u8]) -> VexKeys256 {
-    let mut rk: VexKeys256 = aes_key_schedule_256_even_moar_alt(user_key);
+unsafe fn aes256_dec_key_schedule_asm(rk: &mut VexKeys256, user_key: &[u8]) {
     #[rustfmt::skip]
     unsafe {
         core::arch::asm!(
@@ -629,9 +645,6 @@ unsafe fn aes256_dec_key_schedule_asm(user_key: &[u8]) -> VexKeys256 {
             in("a1") user_key.as_ptr(),
         );
     };
-    let mut rk_out: VexKeys256 = [0u32; 60];
-    rk_out.copy_from_slice(&rk);
-    rk_out
 }
 #[cfg(not(feature = "aes-zkn"))]
 pub fn aes256_dec_key_schedule(user_key: &[u8]) -> VexKeys256 {
