@@ -149,7 +149,7 @@ pub fn wfi_test() {
             "nop",
             "nop",
             "wfi",
-        )
+        );
     }
     tt.wo(utra::ticktimer::MSLEEP_TARGET0, 0xffff_ffff); // sometime way out there so we don't see it again during this test.
     report_api(0x03f1_600d);
