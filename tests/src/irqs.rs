@@ -137,13 +137,9 @@ pub fn wfi_test() {
     tt.wo(utra::ticktimer::MSLEEP_TARGET1, 0);
     tt.wo(utra::ticktimer::MSLEEP_TARGET0, 2);
     tt.wfo(utra::ticktimer::EV_ENABLE_ALARM, 1);
-    unsafe {
-        // Insert 2x NOP-guard so that the enable_alarm bit can propagate through the system.
-        // Otherwise, the CPU clock could stop before the alarm gate is fully enabled.
-        core::arch::asm!("nop");
-        core::arch::asm!("nop");
-        core::arch::asm!("wfi",);
-    }
+    // Ensure data and instruction reads are finished before WFI.
+    // A NOP instruction after WFI is where an IRQ handler will jump back to
+    unsafe { asm!("isb", "dsb", "wfi", "nop") }
     tt.wo(utra::ticktimer::MSLEEP_TARGET0, 0xffff_ffff); // sometime way out there so we don't see it again during this test.
     report_api(0x03f1_600d);
 }
