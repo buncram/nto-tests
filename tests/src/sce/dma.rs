@@ -104,14 +104,14 @@ pub fn sce_dma_tests() -> usize {
             utralib::HW_SEG_HOUT_MEM_LEN / core::mem::size_of::<u32>(),
         )
     };
-    sce_ctl_csr.wfo(utra::sce_glbsfr::SFR_AHBS_CR_AHBSOPT, 0b1_0000); // endian swap AHB read
+    sce_ctl_csr.wfo(utra::sce_glbsfr::SFR_APBS_CR_APBSOPT, 0b1_0000); // endian swap APB read
     uart.tiny_write_str("HOUT (BE): ");
     for i in 0..8 {
         // should be big-endian
         uart.print_hex_word(hout_mem[i]);
     }
     uart.tiny_write_str("\r");
-    sce_ctl_csr.wfo(utra::sce_glbsfr::SFR_AHBS_CR_AHBSOPT, 0b0_0000);
+    sce_ctl_csr.wfo(utra::sce_glbsfr::SFR_APBS_CR_APBSOPT, 0b0_0000);
     uart.tiny_write_str("HOUT (LE): ");
     for i in 0..8 {
         // should be big-endian
