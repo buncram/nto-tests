@@ -139,7 +139,7 @@ pub fn wfi_test() {
     tt.wfo(utra::ticktimer::EV_ENABLE_ALARM, 1);
     // Ensure data and instruction reads are finished before WFI.
     // A NOP instruction after WFI is where an IRQ handler will jump back to
-    unsafe { asm!("isb", "dsb", "wfi", "nop") }
+    unsafe { core::arch::asm!("isb", "dsb", "wfi", "nop") }
     tt.wo(utra::ticktimer::MSLEEP_TARGET0, 0xffff_ffff); // sometime way out there so we don't see it again during this test.
     report_api(0x03f1_600d);
 }
