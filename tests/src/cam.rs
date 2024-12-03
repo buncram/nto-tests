@@ -27,7 +27,7 @@ pub(crate) const CFG_EN: u32 = 0b01_0000; // start a transfer
 pub(crate) const CFG_SIZE_16: u32 = 0b00_0010; // 16-bit transfer
 
 const ROWS: usize = 8;
-const COLS: usize = 12;
+const COLS: usize = 64;
 
 const CAM_TESTS: usize = 1;
 crate::impl_test!(CamTests, "Camera", CAM_TESTS);
