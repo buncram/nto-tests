@@ -38,6 +38,8 @@ pub struct TestCamera {
 }
 impl TestCamera {
     pub fn new() -> TestCamera {
+        let udma_global = cramium_hal::udma::GlobalConfig::new(utra::udma_ctrl::HW_UDMA_CTRL_BASE as *mut u32);
+        udma_global.clock_on(PeriphId::Cam);
         let mut csr = CSR::new(utra::udma_camera::HW_UDMA_CAMERA_BASE as *mut u32);
         let ifram =
             unsafe { IframRange::from_raw_parts(CAM_IFRAM_ADDR, CAM_IFRAM_ADDR, CAM_IFRAM_LEN_PAGES * 4096) };
@@ -59,7 +61,8 @@ impl TestCamera {
         let global = csr.ms(CFG_FRAMEDROP_EN, 0)
             | csr.ms(CFG_FORMAT, Format::BypassLe as u32)
             | csr.ms(CFG_FRAMESLICE_EN, 0)
-            | csr.ms(CFG_SHIFT, 0);
+            | csr.ms(CFG_SHIFT, 0)
+            | 1 << 30; // new field to activate sof snapping of rx
         csr.wo(utra::udma_camera::REG_CAM_CFG_GLOB, global);
 
         TestCamera { csr, ifram }
@@ -102,18 +105,43 @@ impl TestRunner for CamTests {
 
         // initiate a capture
         let total_len = ROWS * COLS;
+        unsafe { tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16) }
+        tc.csr_mut().rmwf(CFG_GLOB_EN, 1);
         crate::println!("frame 1");
+
+        // while tc.udma_busy(Bank::Rx) {}
+        while (tc.csr.r(REG_CAM_CFG_GLOB) & 0x8000_0000) != 0 {}
+
+        // initiate a second, poorly timed capture
+        for _ in 0..7 {
+            crate::println!("time passes...");
+        }
+
+        for i in 0..2 {
+            unsafe { tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16) }
+            // while tc.udma_busy(Bank::Rx) {}
+            while (tc.csr.r(REG_CAM_CFG_GLOB) & 0x8000_0000) != 0 {}
+            crate::println!("frame {} done", i + 2);
+        }
+
+        // now confirm legacy behavior is OK by turning off the sync bit
+        let val = tc.csr().r(REG_CAM_CFG_GLOB) & !0x4000_0000;
+        tc.csr_mut().wo(REG_CAM_CFG_GLOB, val);
+
         unsafe { tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16) }
         tc.csr_mut().rmwf(CFG_GLOB_EN, 1);
+        crate::println!("legacy frame 1");
 
         while tc.udma_busy(Bank::Rx) {}
 
-        // initiate a second, unsynchronized capture
+        // initiate a second, poorly timed capture
+        for _ in 0..7 {
+            crate::println!("time passes...");
+        }
         unsafe { tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16) }
-        tc.csr_mut().rmwf(CFG_GLOB_EN, 1);
-        crate::println!("frame 2");
         while tc.udma_busy(Bank::Rx) {}
-        crate::println!("done");
+
+        crate::println!("legacy frame 2 done");
 
         // revert to PIO ownership of I/O pins
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
