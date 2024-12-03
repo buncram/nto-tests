@@ -16,12 +16,12 @@ impl TestRunner for UdmaTests {
 
         // setup the I/O pins
         let iox = Iox::new(utralib::generated::HW_IOX_BASE as *mut u32);
-    
+
         // give regular I/O ownership of the I/O block, but just the UDMA pins
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
         iox.set_ports_from_pio_bitmask(0x00_7f_ffff);
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
-    
+
         let channel = cramium_hal::board::setup_memory_pins(&iox);
         udma_global.clock_on(PeriphId::from(channel));
         crate::println!("using SPIM channel {:?}", channel);

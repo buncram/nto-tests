@@ -63,6 +63,7 @@ timer0-tests = []
 mbox-tests = []
 rram-tests = []
 udma-tests = []
+cam-tests = []
 
 default = ["fast-fclk"]
 

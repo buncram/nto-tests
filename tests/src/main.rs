@@ -18,6 +18,7 @@ use utralib::generated::*;
 
 mod aes;
 mod bio;
+mod cam;
 mod debug;
 mod gpio;
 mod init;
@@ -146,6 +147,10 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut rram_disturb_tests = rram::RramDisturbTests::new(cfg!(feature = "rram-tests"));
     let mut udma_tests = udma::UdmaTests::new(cfg!(feature = "udma-tests"));
 
+    // single-purpose test bench. Normally meant to be configured off unless looking specifically at these
+    // features.
+    let mut cam_tests = cam::CamTests::new(cfg!(feature = "cam-tests"));
+
     // legacy tests - not run on NTO
     let mut setup_uart2_test = init::SetupUart2Tests::new(false);
     #[cfg(feature = "pio")]
@@ -155,9 +160,10 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut tests: [&mut dyn Test; 20] = [
+    let mut tests: [&mut dyn Test; 21] = [
         &mut reset_value_test,
         // stuff to run first
+        &mut cam_tests,
         &mut rram_tests, // full-chip only, but run early - this isn't passing right now
         &mut gpio_tests,
         // quick tests
