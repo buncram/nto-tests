@@ -23,6 +23,8 @@ pub const CFG_FORMAT: utralib::Field = utralib::Field::new(3, 8, REG_CAM_CFG_GLO
 pub const CFG_SHIFT: utralib::Field = utralib::Field::new(4, 11, REG_CAM_CFG_GLOB);
 pub const CFG_GLOB_EN: utralib::Field = utralib::Field::new(1, 31, REG_CAM_CFG_GLOB);
 
+#[allow(dead_code)]
+pub(crate) const CFG_CONT: u32 = 0b00_0001; // continuous mode
 pub(crate) const CFG_EN: u32 = 0b01_0000; // start a transfer
 pub(crate) const CFG_SIZE_16: u32 = 0b00_0010; // 16-bit transfer
 
@@ -40,6 +42,12 @@ impl TestCamera {
     pub fn new() -> TestCamera {
         let udma_global = cramium_hal::udma::GlobalConfig::new(utra::udma_ctrl::HW_UDMA_CTRL_BASE as *mut u32);
         udma_global.clock_on(PeriphId::Cam);
+        /*
+        udma_global.map_event(
+            PeriphId::Cam,
+            PeriphEventType::Cam(EventCamOffset::Rx),
+            EventChannel::Channel0,
+        );*/
         let mut csr = CSR::new(utra::udma_camera::HW_UDMA_CAMERA_BASE as *mut u32);
         let ifram =
             unsafe { IframRange::from_raw_parts(CAM_IFRAM_ADDR, CAM_IFRAM_ADDR, CAM_IFRAM_LEN_PAGES * 4096) };
@@ -142,6 +150,31 @@ impl TestRunner for CamTests {
         while tc.udma_busy(Bank::Rx) {}
 
         crate::println!("legacy frame 2 done");
+
+        // setup interrupts
+        // re-enable frame sync for rx start
+        let global = tc.csr().ms(CFG_FRAMEDROP_EN, 0)
+            | tc.csr().ms(CFG_FORMAT, Format::BypassLe as u32)
+            | tc.csr().ms(CFG_FRAMESLICE_EN, 0)
+            | tc.csr().ms(CFG_SHIFT, 0)
+            | 1 << 30 // new field to activate sof snapping of rx
+            | tc.csr().ms(CFG_GLOB_EN, 1);
+        tc.csr_mut().wo(utra::udma_camera::REG_CAM_CFG_GLOB, global);
+
+        let mut irq8 = CSR::<u32>::new(utra::irqarray8::HW_IRQARRAY8_BASE as *mut u32);
+        // clear any pending interrupts
+        irq8.wo(utra::irqarray8::EV_PENDING, 0xFFFF);
+
+        // this one is continuous so it never has to be re-initiated
+        crate::println!("Continuous + interrupt driven");
+        unsafe { tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16 | CFG_CONT) }
+        
+        for i in 0..2 {
+            while irq8.rf(utra::irqarray8::EV_PENDING_CAM_RX) == 0 {}
+            // clear pending
+            irq8.wfo(utra::irqarray8::EV_PENDING_CAM_RX, 1);
+            crate::println!("IRQ frame {} done", i + 1);
+        }
 
         // revert to PIO ownership of I/O pins
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
