@@ -104,9 +104,14 @@ impl TestRunner for UdmaTests {
     }
 }
 
+pub const TEST_I2C_MASK: u32 = 0b00001;
 pub const I2C_IFRAM_ADDR: usize = utralib::HW_IFRAM0_MEM + utralib::HW_IFRAM0_MEM_LEN - 8 * 4096;
 impl UdmaTests {
     pub fn i2c_test(&mut self) -> usize {
+        let mut test_cfg = CSR::new(utra::csrtest::HW_CSRTEST_BASE as *mut u32);
+        test_cfg.wo(utra::csrtest::WTEST, 0);
+        test_cfg.wo(utra::csrtest::WTEST, TEST_I2C_MASK);
+    
         let perclk = 100_000_000;
         let udma_global = GlobalConfig::new(utralib::generated::HW_UDMA_CTRL_BASE as *mut u32);
 
@@ -127,6 +132,8 @@ impl UdmaTests {
             i2c.i2c_read(addr, 0xA0u8 + addr as u8 - 10, &mut rx, false).expect("read failed");
             crate::println!("i2c result: {:x?}", rx);
         }
+
+        test_cfg.wo(utra::csrtest::WTEST, 0);
 
         1
     }
