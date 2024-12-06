@@ -3,11 +3,14 @@ use core::convert::TryInto;
 use cramium_hal::board::SPIM_FLASH_IFRAM_ADDR;
 use cramium_hal::ifram::IframRange;
 use cramium_hal::iox::Iox;
+use cramium_hal::iox::{IoSetup, IoxDir, IoxDriveStrength, IoxEnable, IoxFunction, IoxPort};
 use cramium_hal::udma::*;
 
 use crate::*;
 
-const UDMA_TESTS: usize = 2;
+// 2 for spim (one with reset in the middle)
+// 1 for i2c
+const UDMA_TESTS: usize = 2 + 1;
 crate::impl_test!(UdmaTests, "UDMA", UDMA_TESTS);
 impl TestRunner for UdmaTests {
     fn run(&mut self) {
@@ -21,6 +24,8 @@ impl TestRunner for UdmaTests {
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
         iox.set_ports_from_pio_bitmask(0x00_7f_ffff);
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
+
+        self.passing_tests += self.i2c_test();
 
         let channel = cramium_hal::board::setup_memory_pins(&iox);
         udma_global.clock_on(PeriphId::from(channel));
@@ -76,7 +81,10 @@ impl TestRunner for UdmaTests {
                 }
                 for (i, chunk) in dest.chunks(4).enumerate() {
                     let checkval = u32::from_le_bytes(chunk.try_into().unwrap());
-                    assert!(checkval == 0xface_8000 + i as u32 + (test_iter as u32 + 1) * 16 / size_of::<u32>() as u32)
+                    assert!(
+                        checkval
+                            == 0xface_8000 + i as u32 + (test_iter as u32 + 1) * 16 / size_of::<u32>() as u32
+                    )
                 }
                 crate::println!("rom_read check passed!");
                 self.passing_tests += 1;
@@ -94,4 +102,58 @@ impl TestRunner for UdmaTests {
         iox.set_ports_from_pio_bitmask(0xFFFF_FFFF);
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
     }
+}
+
+pub const I2C_IFRAM_ADDR: usize = utralib::HW_IFRAM0_MEM + utralib::HW_IFRAM0_MEM_LEN - 8 * 4096;
+impl UdmaTests {
+    pub fn i2c_test(&mut self) -> usize {
+        let perclk = 100_000_000;
+        let udma_global = GlobalConfig::new(utralib::generated::HW_UDMA_CTRL_BASE as *mut u32);
+
+        // setup the I/O pins
+        let iox = Iox::new(utralib::generated::HW_IOX_BASE as *mut u32);
+        let i2c_channel = setup_i2c_pins(&iox);
+        udma_global.clock(PeriphId::from(i2c_channel), true);
+        let i2c_ifram =
+            unsafe { cramium_hal::ifram::IframRange::from_raw_parts(I2C_IFRAM_ADDR, I2C_IFRAM_ADDR, 4096) };
+        let mut i2c = unsafe {
+            cramium_hal::udma::I2c::new_with_ifram(i2c_channel, 400_000, perclk, i2c_ifram, &udma_global)
+        };
+
+        crate::println!("i2c test");
+        for addr in 10..14 {
+            i2c.i2c_write(addr, 0xA0u8 + addr as u8 - 10, &[]).expect("write failed");
+            let mut rx = [0u8; 1];
+            i2c.i2c_read(addr, 0xA0u8 + addr as u8 - 10, &mut rx, false).expect("read failed");
+            crate::println!("i2c result: {:x?}", rx);
+        }
+
+        1
+    }
+}
+
+pub fn setup_i2c_pins(iox: &dyn IoSetup) -> crate::udma::I2cChannel {
+    // I2C_SCL_B[0]
+    iox.setup_pin(
+        IoxPort::PB,
+        11,
+        Some(IoxDir::Output),
+        Some(IoxFunction::AF1),
+        None,
+        None,
+        Some(IoxEnable::Enable),
+        Some(IoxDriveStrength::Drive2mA),
+    );
+    // I2C_SDA_B[0]
+    iox.setup_pin(
+        IoxPort::PB,
+        12,
+        Some(IoxDir::Output),
+        Some(IoxFunction::AF1),
+        Some(IoxEnable::Enable),
+        None,
+        Some(IoxEnable::Enable),
+        Some(IoxDriveStrength::Drive2mA),
+    );
+    crate::udma::I2cChannel::Channel0
 }
