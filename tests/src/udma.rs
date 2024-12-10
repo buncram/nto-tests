@@ -22,7 +22,7 @@ impl TestRunner for UdmaTests {
 
         // give regular I/O ownership of the I/O block, but just the UDMA pins
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
-        iox.set_ports_from_pio_bitmask(0x00_7f_ffff);
+        iox.set_ports_from_pio_bitmask(0x00_7f_e7ff);
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
 
         self.passing_tests += self.i2c_test();
