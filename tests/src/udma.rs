@@ -22,7 +22,7 @@ impl TestRunner for UdmaTests {
 
         // give regular I/O ownership of the I/O block, but just the UDMA pins
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
-        iox.set_ports_from_pio_bitmask(0x00_7f_ffff);
+        iox.set_ports_from_pio_bitmask(0x00_7f_e7ff);
         println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
 
         self.passing_tests += self.i2c_test();
@@ -111,7 +111,7 @@ impl UdmaTests {
         let mut test_cfg = CSR::new(utra::csrtest::HW_CSRTEST_BASE as *mut u32);
         test_cfg.wo(utra::csrtest::WTEST, 0);
         test_cfg.wo(utra::csrtest::WTEST, TEST_I2C_MASK);
-    
+
         let perclk = 100_000_000;
         let udma_global = GlobalConfig::new(utralib::generated::HW_UDMA_CTRL_BASE as *mut u32);
 
@@ -126,16 +126,27 @@ impl UdmaTests {
         };
 
         crate::println!("i2c test");
+        let mut passing = true;
         for addr in 10..14 {
-            i2c.i2c_write(addr, 0xA0u8 + addr as u8 - 10, &[]).expect("write failed");
-            let mut rx = [0u8; 1];
-            i2c.i2c_read(addr, 0xA0u8 + addr as u8 - 10, &mut rx, false).expect("read failed");
-            crate::println!("i2c result: {:x?}", rx);
+            crate::println!("Tx: {:x}", addr);
+            match i2c.i2c_hdl_test(addr) {
+                Ok(b) => {
+                    crate::println!("Rx: {:x?}", b);
+                }
+                Err(e) => {
+                    if addr == 11 {
+                        crate::println!("Timeout as expected: {:?}", e);
+                    } else {
+                        crate::println!("Unexpected error: {:?}", e);
+                        passing = false;
+                    }
+                }
+            }
         }
 
         test_cfg.wo(utra::csrtest::WTEST, 0);
 
-        1
+        if passing { 1 } else { 0 }
     }
 }
 

@@ -25,6 +25,7 @@ xous-pl230 = { path = "../../xous-core/libs/xous-pl230", default-features = fals
 cramium-hal = { path = "../../xous-core/libs/cramium-hal", features = [
     "udma-stress-test",
     "board-baosec",
+    "hdl-test",
 ] }
 pio-proc = "0.2.2"
 pio = "0.2.1"
