@@ -104,14 +104,9 @@ impl TestRunner for UdmaTests {
     }
 }
 
-pub const TEST_I2C_MASK: u32 = 0b00001;
 pub const I2C_IFRAM_ADDR: usize = utralib::HW_IFRAM0_MEM + utralib::HW_IFRAM0_MEM_LEN - 8 * 4096;
 impl UdmaTests {
     pub fn i2c_test(&mut self) -> usize {
-        let mut test_cfg = CSR::new(utra::csrtest::HW_CSRTEST_BASE as *mut u32);
-        test_cfg.wo(utra::csrtest::WTEST, 0);
-        test_cfg.wo(utra::csrtest::WTEST, TEST_I2C_MASK);
-
         let perclk = 100_000_000;
         let udma_global = GlobalConfig::new(utralib::generated::HW_UDMA_CTRL_BASE as *mut u32);
 
@@ -127,24 +122,76 @@ impl UdmaTests {
 
         crate::println!("i2c test");
         let mut passing = true;
-        for addr in 10..14 {
-            crate::println!("Tx: {:x}", addr);
-            match i2c.i2c_hdl_test(addr) {
-                Ok(b) => {
-                    crate::println!("Rx: {:x?}", b);
+        let dev = 0b1010_100;
+        let adr = 0x4; // start address for read/writes
+        crate::println!("Tx4 to {:x}", adr);
+        let mut data = [0x55u8, 0xaau8, 0xce, 0x01];
+        // ---- base case
+        match i2c.i2c_write(dev, 0x4, &data) {
+            Err(e) => {
+                crate::println!("write to {:x} failed {:?}", adr, e);
+                passing = false;
+            }
+            _ => (),
+        };
+        let mut check = [0u8; 4];
+        crate::println!("Rx...");
+        match i2c.i2c_read(dev, adr, &mut check, true) {
+            Ok(len) => {
+                if len != data.len() {
+                    crate::println!("rbk length mismatch {} != {}", len, data.len());
+                    passing = false;
                 }
-                Err(e) => {
-                    if addr == 11 {
-                        crate::println!("Timeout as expected: {:?}", e);
-                    } else {
-                        crate::println!("Unexpected error: {:?}", e);
+                for (i, (&w, &r)) in data.iter().zip(check.iter()).enumerate() {
+                    if w != r {
+                        crate::println!("{:x}: w{:x} -> r{:x}", i as u8 + adr, w, r);
                         passing = false;
                     }
                 }
             }
+            Err(e) => {
+                crate::println!("read from {:x} failed {:?}", adr, e);
+            }
         }
-
-        test_cfg.wo(utra::csrtest::WTEST, 0);
+        // ----- expected failure
+        match i2c.i2c_write(dev + 1, adr, &[0xEEu8]) {
+            Ok(_) => {
+                crate::println!("write succeeded when it should have failed");
+                passing = false;
+            }
+            Err(e) => {
+                crate::println!("Write reported expected failure of {:?}", e);
+            }
+        }
+        // ---- confirm base case
+        crate::println!("Tx1");
+        data[1] = 0x22; // modify a byte at a non-zero offset
+        // write just the one byte to the address offset
+        match i2c.i2c_write(dev, 0x5, &data[1..2]) {
+            Err(e) => {
+                crate::println!("write to {:x} failed {:?}", adr, e);
+                passing = false;
+            }
+            _ => (),
+        };
+        crate::println!("Rx...");
+        match i2c.i2c_read(dev, adr, &mut check, true) {
+            Ok(len) => {
+                if len != data.len() {
+                    crate::println!("rbk length mismatch {} != {}", len, data.len());
+                    passing = false;
+                }
+                for (i, (&w, &r)) in data.iter().zip(check.iter()).enumerate() {
+                    if w != r {
+                        crate::println!("{:x}: w{:x} -> r{:x}", i as u8 + adr, w, r);
+                        passing = false;
+                    }
+                }
+            }
+            Err(e) => {
+                crate::println!("read from {:x} failed {:?}", adr, e);
+            }
+        }
 
         if passing { 1 } else { 0 }
     }
