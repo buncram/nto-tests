@@ -145,6 +145,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut mbox_test = mbox::MboxTests::new(cfg!(feature = "mbox-tests"));
     let mut rram_tests = rram::RramTests::new(cfg!(feature = "rram-tests"));
     let mut rram_disturb_tests = rram::RramDisturbTests::new(cfg!(feature = "rram-tests"));
+    let mut rram_lifecycle_tests = rram::RramLifecycle::new(cfg!(feature = "lifecycle-tests"));
     let mut udma_tests = udma::UdmaTests::new(cfg!(feature = "udma-tests"));
 
     // single-purpose test bench. Normally meant to be configured off unless looking specifically at these
@@ -160,10 +161,11 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(false);
 
-    let mut tests: [&mut dyn Test; 21] = [
+    let mut tests: [&mut dyn Test; 22] = [
         &mut reset_value_test,
         // stuff to run first
         &mut cam_tests,
+        &mut rram_lifecycle_tests,
         &mut rram_tests, // full-chip only, but run early - this isn't passing right now
         &mut gpio_tests,
         // quick tests

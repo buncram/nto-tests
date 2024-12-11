@@ -21,8 +21,9 @@ const QUICK_TESTS: usize = 8;
 const CORNER_TESTS: usize = 12;
 const CORNERS: usize = 4;
 const CORNERS_TOTAL: usize = CORNER_TESTS * CORNERS * size_of::<u32>();
+const LIFECYCLE_TESTS: usize = 1;
 
-const TOTAL_TESTS: usize = QUICK_TESTS + CORNERS_TOTAL;
+const TOTAL_TESTS: usize = QUICK_TESTS + CORNERS_TOTAL + LIFECYCLE_TESTS;
 crate::impl_test!(RramTests, "RRAM", TOTAL_TESTS);
 
 impl TestRunner for RramTests {
@@ -400,4 +401,30 @@ fn cache_flush() {
             "nop",
         );
     }
+}
+
+pub const KEYSEL_START: usize = 0x603F_0000;
+pub const DATASEL_START: usize = 0x603E_0000;
+pub const ACRAM_START: usize = 0x603D_C000;
+pub const CODESEL_END: usize = 0x603D_A000;
+
+crate::impl_test!(RramLifecycle, "RRAM Lifecycle", LIFECYCLE_TESTS);
+impl TestRunner for RramLifecycle {
+    fn run(&mut self) { self.passing_tests += rram_lockzones(); }
+}
+
+pub fn rram_lockzones() -> usize {
+    let cases = [
+        ("keysel", KEYSEL_START),
+        ("datasel", DATASEL_START),
+        ("codesel", CODESEL_END - 0x1000),
+        ("acram", ACRAM_START),
+    ];
+    for (case, base) in cases {
+        crate::println!("{} base: {:x}", case, unsafe { (base as *mut u32).read_volatile() });
+        unsafe { (base as *mut u32).write_volatile(0x0000_FFFF) };
+        crate::println!("{} poke FFFF: {:x}", case, unsafe { (base as *mut u32).read_volatile() });
+    }
+
+    1
 }

@@ -65,6 +65,7 @@ mbox-tests = []
 rram-tests = []
 udma-tests = []
 cam-tests = []
+lifecycle-tests = []
 
 default = ["fast-fclk"]
 
