@@ -414,16 +414,27 @@ impl TestRunner for RramLifecycle {
 }
 
 pub fn rram_lockzones() -> usize {
+    let mut reram = Reram::new();
     let cases = [
         ("keysel", KEYSEL_START),
         ("datasel", DATASEL_START),
         ("codesel", CODESEL_END - 0x1000),
         ("acram", ACRAM_START),
     ];
-    for (case, base) in cases {
-        crate::println!("{} base: {:x}", case, unsafe { (base as *mut u32).read_volatile() });
-        unsafe { (base as *mut u32).write_volatile(0x0000_FFFF) };
-        crate::println!("{} poke FFFF: {:x}", case, unsafe { (base as *mut u32).read_volatile() });
+    for i in 1..3 {
+        for &(case, base) in cases.iter() {
+            crate::println!("{} base: @{:x} -> {:x}", case, base, unsafe { (base as *mut u32).read_volatile() });
+            // has to write in 4's
+            let mut testdata = [0u32; 8];
+            for (j, d) in testdata.iter_mut().enumerate() {
+                *d = (0x1000 * i + j) as u32;
+            }
+            unsafe {
+                reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &testdata);
+            }
+            cache_flush();
+            crate::println!("{} poke{} {:x}: {:x}", case, i, base, unsafe { (base as *mut u32).read_volatile() });
+        }
     }
 
     1
