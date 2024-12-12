@@ -406,6 +406,8 @@ fn cache_flush() {
 pub const KEYSEL_START: usize = 0x603F_0000;
 pub const DATASEL_START: usize = 0x603E_0000;
 pub const ACRAM_START: usize = 0x603D_C000;
+pub const ONEWAY_START: usize = 0x603D_A000;
+pub const ONEWAY2_START: usize = 0x603D_B000;
 pub const CODESEL_END: usize = 0x603D_A000;
 
 crate::impl_test!(RramLifecycle, "RRAM Lifecycle", LIFECYCLE_TESTS);
@@ -423,7 +425,9 @@ pub fn rram_lockzones() -> usize {
     ];
     for i in 1..3 {
         for &(case, base) in cases.iter() {
-            crate::println!("{} base: @{:x} -> {:x}", case, base, unsafe { (base as *mut u32).read_volatile() });
+            crate::println!("{} base: @{:x} -> {:x}", case, base, unsafe {
+                (base as *mut u32).read_volatile()
+            });
             // has to write in 4's
             let mut testdata = [0u32; 8];
             for (j, d) in testdata.iter_mut().enumerate() {
@@ -433,7 +437,9 @@ pub fn rram_lockzones() -> usize {
                 reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &testdata);
             }
             cache_flush();
-            crate::println!("{} poke{} {:x}: {:x}", case, i, base, unsafe { (base as *mut u32).read_volatile() });
+            crate::println!("{} poke{} {:x}: {:x}", case, i, base, unsafe {
+                (base as *mut u32).read_volatile()
+            });
         }
     }
 
