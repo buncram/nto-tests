@@ -14,6 +14,11 @@ const UDMA_TESTS: usize = 2 + 1;
 crate::impl_test!(UdmaTests, "UDMA", UDMA_TESTS);
 impl TestRunner for UdmaTests {
     fn run(&mut self) {
+        // To check this result:
+        //   - Go to i_spim_gen[1] inside soc_ifsub.__gen_udma.dmasub.udma
+        //   - View `rx_backpressure_i`, `rx_data_ready_i`, `rx_data_valid_o`
+        //   - Go to genblk1[5] in soc_ifsub.__gen_udma.udma.i_udma_core.u_rx_channels
+        //   - View int_ch_curr_addr_o
         crate::println!("starting UDMA SPIM stress test");
         let udma_global = GlobalConfig::new(utralib::generated::HW_UDMA_CTRL_BASE as *mut u32);
 
@@ -156,9 +161,12 @@ impl UdmaTests {
         // ----- expected failure
         crate::println!("Timeout test...");
         let timeout = [0xEEu8];
-        match i2c.i2c_write(2, adr, &timeout) { // 2 is a bogus device that doesn't exist
+        match i2c.i2c_write(2, adr, &timeout) {
+            // 2 is a bogus device that doesn't exist
             Ok(_) => {
-                crate::println!("write succeeded when it should have failed, but apparently there is no way to know otherwise");
+                crate::println!(
+                    "write succeeded when it should have failed, but apparently there is no way to know otherwise"
+                );
             }
             Err(e) => {
                 crate::println!("Write reported expected failure of {:?}", e);
