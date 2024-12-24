@@ -21,9 +21,12 @@ const QUICK_TESTS: usize = 8;
 const CORNER_TESTS: usize = 12;
 const CORNERS: usize = 4;
 const CORNERS_TOTAL: usize = CORNER_TESTS * CORNERS * size_of::<u32>();
+
+// lifecycle tests are not yet complete, because the code for handling lifecycles
+// is not yet defined.
 const LIFECYCLE_TESTS: usize = 1;
 
-const TOTAL_TESTS: usize = QUICK_TESTS + CORNERS_TOTAL + LIFECYCLE_TESTS;
+const TOTAL_TESTS: usize = QUICK_TESTS + CORNERS_TOTAL;
 crate::impl_test!(RramTests, "RRAM", TOTAL_TESTS);
 
 impl TestRunner for RramTests {
