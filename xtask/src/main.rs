@@ -117,6 +117,8 @@ fn build(
     print!("Building");
 
     args.push("--no-default-features");
+    args.push("--features");
+    args.push("aes-zkn");
 
     for package in packages {
         print!(" {}", package);
