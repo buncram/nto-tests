@@ -9,6 +9,10 @@
 // MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE.
 // Please see the [CERN-OHL- W-2.0] for applicable conditions.
 
+#[cfg(feature = "coreuser-lutop")]
+use utra::coreuser::{
+    CONTROL, CONTROL_ENABLE, CONTROL_MPP, CONTROL_PRIVILEGE, CONTROL_SHIFT, CONTROL_USE8BIT, STATUS_COREUSER,
+};
 #[cfg(feature = "coreuser-compression")]
 use utralib::generated::*;
 
@@ -19,8 +23,7 @@ crate::impl_test!(SatpTests, "SATP", SATP_TESTS);
 impl TestRunner for SatpTests {
     fn run(&mut self) {
         // This relies on both SATP and IRQs being setup
-        satp_test();
-        self.passing_tests += 1;
+        self.passing_tests += satp_test();
     }
 }
 const SATP_SETUP: usize = 1;
@@ -224,7 +227,8 @@ pub fn to_user_mode() {
     }
 }
 
-pub fn satp_test() {
+pub fn satp_test() -> usize {
+    let mut passing = 1;
     report_api(0x5a1d_0000);
     #[cfg(feature = "coreuser-compression")]
     {
@@ -287,6 +291,175 @@ pub fn satp_test() {
             report_api(coreuser.rf(utra::coreuser::GET_ASID_VALUE_VALUE) << 16 | asid);
         }
     }
+    #[cfg(feature = "coreuser-lutop")]
+    {
+        let mut coreuser = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
+
+        // check if coreuser has the expected value on reset
+        if coreuser.rf(STATUS_COREUSER) != 0x1 {
+            crate::println!("coreuser init fail: {} != 1", coreuser.rf(STATUS_COREUSER));
+            passing = 0;
+        }
+
+        // setup the 8-bit wide test
+        coreuser.wo(CONTROL, 0);
+        coreuser.rmwf(CONTROL_USE8BIT, 1);
+        coreuser.rmwf(CONTROL_ENABLE, 1);
+
+        for asid in 0..512 {
+            let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
+            unsafe {
+                core::arch::asm!(
+                    "csrw        satp, {satp_val}",
+                    "sfence.vma",
+                    satp_val = in(reg) satp,
+                );
+            }
+            if asid < 256 {
+                if coreuser.rf(utra::coreuser::STATUS_COREUSER) != asid {
+                    crate::println!(
+                        "coreuser 8-bit fail {} != {}",
+                        asid,
+                        coreuser.rf(utra::coreuser::STATUS_COREUSER)
+                    );
+                    passing = 0;
+                }
+            } else {
+                if coreuser.rf(utra::coreuser::STATUS_COREUSER) != 0xFF {
+                    crate::println!("coreuser 8-bit > 255 did not spoil");
+                    passing = 0;
+                }
+            }
+        }
+        // check that MPP requirement clamps coreuser to 0x0
+        coreuser.rmwf(CONTROL_MPP, 0);
+        coreuser.rmwf(CONTROL_PRIVILEGE, 1);
+        // shorter test because just checking a gating function
+        for asid in 0..16 {
+            let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
+            unsafe {
+                core::arch::asm!(
+                    "csrw        satp, {satp_val}",
+                    "sfence.vma",
+                    satp_val = in(reg) satp,
+                );
+            }
+            if coreuser.rf(utra::coreuser::STATUS_COREUSER) != 0x0 {
+                crate::println!("coreuser 8-bit did not gate on MPP");
+                passing = 0;
+            }
+        }
+
+        // setup the 1-bit wide test
+        coreuser.wo(CONTROL, 0);
+        coreuser.rmwf(CONTROL_USE8BIT, 0);
+        coreuser.rmwf(CONTROL_ENABLE, 1);
+        let trusted_asids = [1, 0x17, 0x18, 0x52, 0x57, 1, 1, 0x60];
+        let asid_fields = [
+            utra::coreuser::MAP_LO_LUT0,
+            utra::coreuser::MAP_LO_LUT1,
+            utra::coreuser::MAP_LO_LUT2,
+            utra::coreuser::MAP_LO_LUT3,
+            utra::coreuser::MAP_HI_LUT4,
+            utra::coreuser::MAP_HI_LUT5,
+            utra::coreuser::MAP_HI_LUT6,
+            utra::coreuser::MAP_HI_LUT7,
+        ];
+        for (&asid, field) in trusted_asids.iter().zip(asid_fields) {
+            coreuser.rmwf(field, asid);
+        }
+
+        // set 1-bit with no shift
+        for asid in 0..512 {
+            let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
+            unsafe {
+                core::arch::asm!(
+                    "csrw        satp, {satp_val}",
+                    "sfence.vma",
+                    satp_val = in(reg) satp,
+                );
+            }
+            if trusted_asids.iter().any(|&x| x == asid) {
+                if coreuser.rf(STATUS_COREUSER) != 0x1 {
+                    crate::println!("coreuser 1-bit failed to match on {}", asid);
+                    passing = 0;
+                }
+            } else {
+                if coreuser.rf(STATUS_COREUSER) != 0 {
+                    crate::println!(
+                        "coreuser 1-bit matched erroneously on {}, {} should be 0",
+                        asid,
+                        coreuser.rf(STATUS_COREUSER)
+                    );
+                    passing = 0;
+                }
+            }
+        }
+
+        // check that the shift worked
+        let asid = 1; // this is a matching ASID in the existing table
+        let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
+        unsafe {
+            core::arch::asm!(
+                "csrw        satp, {satp_val}",
+                "sfence.vma",
+                satp_val = in(reg) satp,
+            );
+        }
+        for i in 0..8 {
+            coreuser.rmwf(CONTROL_SHIFT, i);
+            if coreuser.rf(STATUS_COREUSER) != 0x1 << i {
+                crate::println!("coreuser 1-bit failed to match on shift test {} << {}", asid, i);
+                passing = 0;
+            }
+        }
+        let asid = 2; // this is a failing ASID
+        let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
+        unsafe {
+            core::arch::asm!(
+                "csrw        satp, {satp_val}",
+                "sfence.vma",
+                satp_val = in(reg) satp,
+            );
+        }
+        for i in 0..8 {
+            coreuser.rmwf(CONTROL_SHIFT, i);
+            if coreuser.rf(STATUS_COREUSER) != 0x0 {
+                crate::println!("coreuser 1-bit shift test erroneously matched on {} << {}", asid, i);
+                passing = 0;
+            }
+        }
+
+        // now check MPP bit
+        coreuser.rmwf(CONTROL_SHIFT, 0);
+        let asid = 1; // this is a matching ASID in the existing table
+        let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
+        unsafe {
+            core::arch::asm!(
+                "csrw        satp, {satp_val}",
+                "sfence.vma",
+                satp_val = in(reg) satp,
+            );
+        }
+        if coreuser.rf(STATUS_COREUSER) != 0x1 {
+            crate::println!("MPP test did not setup coreuser as expected");
+            passing = 0;
+        }
+        // turn on MPP
+        coreuser.rmwf(CONTROL_MPP, 0);
+        coreuser.rmwf(CONTROL_PRIVILEGE, 1);
+        // we should have a match fail because we're not in user mode (MPP != 0)
+        if coreuser.rf(STATUS_COREUSER) != 0x0 {
+            crate::println!("MPP bit did not de-activate coreuser as expected");
+            passing = 0;
+        }
+        coreuser.rmwf(CONTROL_MPP, 1);
+        // check that machine mode did match
+        if coreuser.rf(STATUS_COREUSER) != 0x1 {
+            crate::println!("MPP bit did not match on machine mode as expected");
+            passing = 0;
+        }
+    }
 
     // now try changing the SATP around and see that the coreuser value updates
     // since we are in supervisor mode we can diddle with this at will, normally
@@ -337,4 +510,5 @@ pub fn satp_test() {
     report_api(0x5a1d_0004);
 
     report_api(0x5a1d_600d);
+    passing
 }

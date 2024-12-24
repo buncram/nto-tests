@@ -41,6 +41,7 @@ sram-margin = []
 debug-irq = []
 bio-mul = ["xous-bio-bdma/bio-mul"]
 coreuser-compression = []           # this feature is not used
+coreuser-lutop = []
 pio = []
 
 # legacy tests
@@ -67,7 +68,7 @@ udma-tests = []
 cam-tests = []
 lifecycle-tests = []
 
-default = ["fast-fclk"]
+default = ["fast-fclk", "coreuser-lutop"]
 
 [target.'cfg(not(any(windows, unix)))'.dependencies]
 utralib = { path = "../utralib" }
