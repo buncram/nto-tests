@@ -16,7 +16,7 @@ use utralib::generated::*;
 
 use crate::*;
 
-const MBOX_TESTS: usize = 1;
+const MBOX_TESTS: usize = 3;
 crate::impl_test!(MboxTests, "MBOX", MBOX_TESTS);
 impl TestRunner for MboxTests {
     fn run(&mut self) {
@@ -24,6 +24,15 @@ impl TestRunner for MboxTests {
             crate::println!("waiting {}\n", i);
         }
 
+        // each of these tests auto-incs the passed field
+        self.knock();
+        self.abort();
+        self.knock();
+    }
+}
+
+impl MboxTests {
+    pub fn knock(&mut self) {
         let mut mbox = Mbox::new();
 
         let test_data = [0xC0DE_0000u32, 0x0000_600Du32, 0, 0, 0, 0, 0, 0];
@@ -88,8 +97,17 @@ impl TestRunner for MboxTests {
             }
         };
     }
-}
 
+    pub fn abort(&mut self) {
+        let mut mbox = Mbox::new();
+        match mbox.abort() {
+            Ok(_) => self.passing_tests += 1,
+            Err(e) => {
+                crate::println!("Abort test failed with {:?}", e);
+            }
+        }
+    }
+}
 /// This constraint is limited by the size of the memory on the CM7 side
 const MAX_PKT_LEN: usize = 128;
 const MBOX_PROTOCOL_REV: u32 = 0;
@@ -105,6 +123,7 @@ pub enum MboxError {
     RxOverflow,
     RxUnderflow,
     InvalidOpcode,
+    AbortFailed,
 }
 
 #[repr(u16)]
@@ -207,4 +226,16 @@ impl Mbox {
     }
 
     pub fn poll_not_ready(&self) -> bool { self.csr.rf(mailbox::EV_PENDING_AVAILABLE) == 0 }
+
+    pub fn abort(&mut self) -> Result<(), MboxError> {
+        crate::println!("Initiating abort");
+        self.csr.wfo(utra::mailbox::CONTROL_ABORT, 1);
+        const TIMEOUT: usize = 1000;
+        for _ in 0..TIMEOUT {
+            if self.csr.rf(utra::mailbox::STATUS_ABORT_ACK) != 0 {
+                return Ok(());
+            }
+        }
+        return Err(MboxError::AbortFailed);
+    }
 }
