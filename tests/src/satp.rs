@@ -12,6 +12,7 @@
 #[cfg(feature = "coreuser-lutop")]
 use utra::coreuser::{
     CONTROL, CONTROL_ENABLE, CONTROL_MPP, CONTROL_PRIVILEGE, CONTROL_SHIFT, CONTROL_USE8BIT, STATUS_COREUSER,
+    USERVALUE,
 };
 #[cfg(feature = "coreuser-compression")]
 use utralib::generated::*;
@@ -296,7 +297,9 @@ pub fn satp_test() -> usize {
         let mut coreuser = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
 
         // check if coreuser has the expected value on reset
-        if coreuser.rf(STATUS_COREUSER) != 0x1 {
+        let expected_default = 0x0; // this maps to the `boot0` user
+        crate::println!("coreuser expected default: {}", expected_default);
+        if coreuser.rf(STATUS_COREUSER) != expected_default {
             crate::println!("coreuser init fail: {} != 1", coreuser.rf(STATUS_COREUSER));
             passing = 0;
         }
@@ -350,89 +353,39 @@ pub fn satp_test() -> usize {
             }
         }
 
-        // setup the 1-bit wide test
+        crate::println!("coreuser 2bit basic");
         coreuser.wo(CONTROL, 0);
         coreuser.rmwf(CONTROL_USE8BIT, 0);
         coreuser.rmwf(CONTROL_ENABLE, 1);
-        let trusted_asids = [1, 0x17, 0x18, 0x52, 0x57, 1, 1, 0x60];
+        let mut default = 0x3;
+        // set to 0 so we can safely mask it later on
+        coreuser.wo(USERVALUE, 0);
+        coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, default);
+        let trusted_asids = [(1, 0), (0x17, 1), (0x18, 2), (0x52, 3), (0x57, 2), (1, 0), (1, 0), (0x60, 1)];
         let asid_fields = [
-            utra::coreuser::MAP_LO_LUT0,
-            utra::coreuser::MAP_LO_LUT1,
-            utra::coreuser::MAP_LO_LUT2,
-            utra::coreuser::MAP_LO_LUT3,
-            utra::coreuser::MAP_HI_LUT4,
-            utra::coreuser::MAP_HI_LUT5,
-            utra::coreuser::MAP_HI_LUT6,
-            utra::coreuser::MAP_HI_LUT7,
+            (utra::coreuser::MAP_LO_LUT0, utra::coreuser::USERVALUE_USER0),
+            (utra::coreuser::MAP_LO_LUT1, utra::coreuser::USERVALUE_USER1),
+            (utra::coreuser::MAP_LO_LUT2, utra::coreuser::USERVALUE_USER2),
+            (utra::coreuser::MAP_LO_LUT3, utra::coreuser::USERVALUE_USER3),
+            (utra::coreuser::MAP_HI_LUT4, utra::coreuser::USERVALUE_USER4),
+            (utra::coreuser::MAP_HI_LUT5, utra::coreuser::USERVALUE_USER5),
+            (utra::coreuser::MAP_HI_LUT6, utra::coreuser::USERVALUE_USER6),
+            (utra::coreuser::MAP_HI_LUT7, utra::coreuser::USERVALUE_USER7),
         ];
-        for (&asid, field) in trusted_asids.iter().zip(asid_fields) {
-            coreuser.rmwf(field, asid);
+        for (&(asid, value), (map_field, uservalue_field)) in trusted_asids.iter().zip(asid_fields) {
+            coreuser.rmwf(map_field, asid);
+            coreuser.rmwf(uservalue_field, value);
         }
 
-        // set 1-bit with no shift
-        for asid in 0..512 {
-            let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
-            unsafe {
-                core::arch::asm!(
-                    "csrw        satp, {satp_val}",
-                    "sfence.vma",
-                    satp_val = in(reg) satp,
-                );
-            }
-            if trusted_asids.iter().any(|&x| x == asid) {
-                if coreuser.rf(STATUS_COREUSER) != 0x1 {
-                    crate::println!("coreuser 1-bit failed to match on {}", asid);
-                    passing = 0;
-                }
-            } else {
-                if coreuser.rf(STATUS_COREUSER) != 0 {
-                    crate::println!(
-                        "coreuser 1-bit matched erroneously on {}, {} should be 0",
-                        asid,
-                        coreuser.rf(STATUS_COREUSER)
-                    );
-                    passing = 0;
-                }
-            }
-        }
-
-        // check that the shift worked
-        let asid = 1; // this is a matching ASID in the existing table
-        let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
-        unsafe {
-            core::arch::asm!(
-                "csrw        satp, {satp_val}",
-                "sfence.vma",
-                satp_val = in(reg) satp,
-            );
-        }
-        for i in 0..8 {
-            coreuser.rmwf(CONTROL_SHIFT, i);
-            if coreuser.rf(STATUS_COREUSER) != 0x1 << i {
-                crate::println!("coreuser 1-bit failed to match on shift test {} << {}", asid, i);
-                passing = 0;
-            }
-        }
-        let asid = 2; // this is a failing ASID
-        let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
-        unsafe {
-            core::arch::asm!(
-                "csrw        satp, {satp_val}",
-                "sfence.vma",
-                satp_val = in(reg) satp,
-            );
-        }
-        for i in 0..8 {
-            coreuser.rmwf(CONTROL_SHIFT, i);
-            if coreuser.rf(STATUS_COREUSER) != 0x0 {
-                crate::println!("coreuser 1-bit shift test erroneously matched on {} << {}", asid, i);
-                passing = 0;
-            }
-        }
+        // set 2-bit with no shift, manual entries
+        if !check_2bit(&trusted_asids, 0, default) {
+            passing = 0;
+        };
 
         // now check MPP bit
+        crate::println!("coreuser MPP");
         coreuser.rmwf(CONTROL_SHIFT, 0);
-        let asid = 1; // this is a matching ASID in the existing table
+        let asid = 1; // this is a matching ASID in the existing table, and should match to non-default (0)
         let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
         unsafe {
             core::arch::asm!(
@@ -441,7 +394,7 @@ pub fn satp_test() -> usize {
                 satp_val = in(reg) satp,
             );
         }
-        if coreuser.rf(STATUS_COREUSER) != 0x1 {
+        if coreuser.rf(STATUS_COREUSER) != 0 {
             crate::println!("MPP test did not setup coreuser as expected");
             passing = 0;
         }
@@ -449,15 +402,50 @@ pub fn satp_test() -> usize {
         coreuser.rmwf(CONTROL_MPP, 0);
         coreuser.rmwf(CONTROL_PRIVILEGE, 1);
         // we should have a match fail because we're not in user mode (MPP != 0)
-        if coreuser.rf(STATUS_COREUSER) != 0x0 {
+        if coreuser.rf(STATUS_COREUSER) != default {
             crate::println!("MPP bit did not de-activate coreuser as expected");
             passing = 0;
         }
         coreuser.rmwf(CONTROL_MPP, 1);
         // check that machine mode did match
-        if coreuser.rf(STATUS_COREUSER) != 0x1 {
+        if coreuser.rf(STATUS_COREUSER) != 0x0 {
             crate::println!("MPP bit did not match on machine mode as expected");
             passing = 0;
+        }
+
+        // do some pseudorandom values into the table + shift values
+        let mut random_asids = [(0u32, 0u32); 8];
+        let mut state = 0xface_f001;
+        for shift in 0..7 {
+            crate::println!("coreuser shift {}", shift);
+            coreuser.rmwf(CONTROL_SHIFT, shift);
+            // pick a random default
+            state = lfsr_next_u32(state);
+            default = state & 0x3;
+            coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, default);
+
+            for (asid, val) in random_asids.iter_mut() {
+                state = lfsr_next_u32(state);
+                *asid = state & 0xFF;
+                state = lfsr_next_u32(state);
+                *val = state & 0x3;
+            }
+            for (&(asid, value), (map_field, uservalue_field)) in random_asids.iter().zip(asid_fields) {
+                coreuser.rmwf(map_field, asid);
+                coreuser.rmwf(uservalue_field, value);
+            }
+            default = lfsr_next_u32(state) & 0x3;
+            coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, default);
+            if !check_2bit(&random_asids, shift as usize, default) {
+                passing = 0;
+            };
+        }
+
+        // restore some sanity
+        coreuser.rmwf(CONTROL_SHIFT, 0);
+        for (&(asid, value), (map_field, uservalue_field)) in trusted_asids.iter().zip(asid_fields) {
+            coreuser.rmwf(map_field, asid);
+            coreuser.rmwf(uservalue_field, value);
         }
     }
 
@@ -510,5 +498,53 @@ pub fn satp_test() -> usize {
     report_api(0x5a1d_0004);
 
     report_api(0x5a1d_600d);
+    passing
+}
+
+/// returns `true` if pass
+fn check_2bit(lut: &[(u32, u32); 8], shift: usize, default: u32) -> bool {
+    let verbose = false;
+    let coreuser = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
+    let mut passing = true;
+
+    for asid in 0..512 {
+        let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
+        unsafe {
+            core::arch::asm!(
+                "csrw        satp, {satp_val}",
+                "sfence.vma",
+                satp_val = in(reg) satp,
+            );
+        }
+        let rbk = coreuser.rf(STATUS_COREUSER);
+        if lut.iter().any(|&(test_asid, _value)| test_asid == asid) {
+            let mut found = false;
+            for &(test_asid, value) in lut.iter() {
+                if asid == test_asid {
+                    found = true;
+                    if rbk != (value << shift as u32) {
+                        crate::println!("coreuser 2-bit failed to match on {}: {} got {}", asid, value, rbk);
+                        passing = false;
+                    } else {
+                        if verbose {
+                            crate::println!("coreuser 2-bit match success {} -> {}", asid, rbk);
+                        }
+                    }
+                }
+            }
+            assert!(found, "ASID was not found in test set when it should have been!");
+        } else {
+            if rbk != (default << shift as u32) {
+                crate::println!(
+                    "coreuser 2-bit match miss failed to map on {} to default: {} got {}",
+                    asid,
+                    default,
+                    rbk,
+                );
+                passing = false;
+            }
+        }
+    }
+
     passing
 }
