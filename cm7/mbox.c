@@ -52,6 +52,7 @@ void NMI_Handler(void);
 void nothing();
 void main_loop();
 void Mbox_Handler(void);
+void Mbox_Abort(void);
 int32_t serialize_tx(mbox_pkt_t *resp_pkt);
 int32_t deserialize_rx(mbox_pkt_t *mbox_pkt);
 
@@ -89,8 +90,9 @@ void clifford(uint8_t *buf);
 #define MAX_PKT_LEN 128
 
 #define MBOX_AVAIL_NVIC  ((IRQn_Type) 18)
+#define MBOX_ABORT_NVIC  ((IRQn_Type) 19)
 
-const VECTOR_TABLE_Type __VECTOR_TABLE[35] __VECTOR_TABLE_ATTRIBUTE = {
+const VECTOR_TABLE_Type __VECTOR_TABLE[36] __VECTOR_TABLE_ATTRIBUTE = {
     (VECTOR_TABLE_Type)(&__INITIAL_SP),       /* 0 Initial Stack Pointer */
     Reset_Handler,                            /* 1 Reset Handler */
     NMI_Handler,                              /* 2 NMI Handler */
@@ -126,6 +128,7 @@ const VECTOR_TABLE_Type __VECTOR_TABLE[35] __VECTOR_TABLE_ATTRIBUTE = {
     nothing, // NV16
     nothing, // NV17
     Mbox_Handler, // NV18 -> mbox_available
+    Mbox_Abort, // NV19 -> mbox abort
 };
 
 #if defined ( __GNUC__ )
@@ -229,6 +232,8 @@ void Reset_Handler(void) {
     } */
     NVIC_SetPriority(MBOX_AVAIL_NVIC, 1);
     NVIC_EnableIRQ(MBOX_AVAIL_NVIC);
+    NVIC_SetPriority(MBOX_ABORT_NVIC, 1);
+    NVIC_EnableIRQ(MBOX_ABORT_NVIC);
 
     __enable_irq();
 
@@ -248,6 +253,14 @@ void NMI_Handler() {
     }
     __DSB();
     */
+}
+
+void Mbox_Abort() {
+    print_string("Abort\r");
+    // ack the abort by setting this bit
+    MBOX_ABORT = 0x1;
+    // clear the pending bit
+    NVIC->ICPR[MBOX_ABORT_NVIC >> 5] = (1 << (MBOX_ABORT_NVIC & 0x1F));
 }
 
 void Mbox_Handler() {
