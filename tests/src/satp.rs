@@ -503,9 +503,10 @@ pub fn satp_test() -> usize {
 }
 
 /// returns `true` if pass
+#[cfg(feature = "coreuser-lutop")]
 fn check_2bit(lut: &[(u32, u32); 8], shift: usize, default: u32) -> bool {
     let verbose = false;
-    let coreuser = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
+    let coreuser: CSR<u32> = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
     let mut passing = true;
 
     for asid in 0..512 {
