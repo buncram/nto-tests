@@ -101,7 +101,10 @@ impl MboxTests {
     pub fn abort(&mut self) {
         let mut mbox = Mbox::new();
         match mbox.abort() {
-            Ok(_) => self.passing_tests += 1,
+            Ok(_) => {
+                crate::println!("Abort OK");
+                self.passing_tests += 1
+            }
             Err(e) => {
                 crate::println!("Abort test failed with {:?}", e);
             }
@@ -191,6 +194,9 @@ impl Mbox {
     }
 
     pub fn try_send(&mut self, to_cm7: MboxToCm7Pkt) -> Result<(), MboxError> {
+        // clear any pending bits from previous transactions
+        self.csr.w(mailbox::EV_PENDING, self.csr.r(mailbox::EV_PENDING));
+
         if to_cm7.len > MAX_PKT_LEN {
             Err(MboxError::TxOverflow)
         } else {
