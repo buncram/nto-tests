@@ -294,6 +294,7 @@ pub fn satp_test() -> usize {
     }
     #[cfg(feature = "coreuser-lutop")]
     {
+        crate::println!("coruser LUT option testing...");
         let mut coreuser = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
 
         // check if coreuser has the expected value on reset
