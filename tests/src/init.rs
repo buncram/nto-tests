@@ -198,6 +198,8 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_2.offset()).write_volatile(0x1f3f); // hclk
         daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_3.offset()).write_volatile(0x0f1f); // iclk
         daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_4.offset()).write_volatile(0x070f); // pclk
+        // perclk divider - set to divide by 8 off of an 800Mhz base. Only found on NTO.
+        daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x03_ff_ff);
         // commit dividers
         daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
     }
