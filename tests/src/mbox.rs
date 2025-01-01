@@ -232,7 +232,7 @@ impl Mbox {
         self.csr.wfo(utra::mailbox::CONTROL_ABORT, 1);
         const TIMEOUT: usize = 1000;
         for _ in 0..TIMEOUT {
-            if self.csr.rf(utra::mailbox::STATUS_ABORT_ACK) != 0 {
+            if self.csr.rf(utra::mailbox::STATUS_ABORT_IN_PROGRESS) == 0 {
                 return Ok(());
             }
         }
