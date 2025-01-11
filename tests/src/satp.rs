@@ -337,7 +337,7 @@ pub fn satp_test() -> usize {
             passing = 0;
         };
 
-        // now check MPP bit. should be in machine mode now.
+        // now check inversion bit - in machine mode
         crate::println!("coreuser MPP - machine mode");
         // mpp should be 11 in this test
         // coreuser.rmwf(CONTROL_INVERT_PRIV, 0); // should already be 0
@@ -353,6 +353,8 @@ pub fn satp_test() -> usize {
             passing = 0;
         }
 
+        // can't change actual priv state in test so these don't work
+        /*
         use riscv::register::mstatus;
         // set MPP to 0
         crate::println!("coreuser MPP - user mode");
@@ -389,6 +391,7 @@ pub fn satp_test() -> usize {
 
         crate::println!("coreuser MPP - return to machine mode");
         unsafe { mstatus::set_mpp(mstatus::MPP::Machine) };
+        */
 
         // do some pseudorandom values into the table + shift values
         let mut random_asids = [(0u32, 0u32); 8];
@@ -650,6 +653,14 @@ pub fn satp_test() -> usize {
         );
     }
 
+    // control is locked, but confirm the mm state before switching priv levels
+    let coreuser = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
+    if coreuser.rf(STATUS_MM) != 1 {
+        // machine mode + not invert -> assert status
+        crate::println!("machine mode output mismatch (mm, !inv, != 1): {:x}", coreuser.r(STATUS));
+        passing = 0;
+    }
+
     // switch to user mode
     report_api(0x5a1d_0002);
     to_user_mode();
@@ -673,6 +684,13 @@ pub fn satp_test() -> usize {
         );
     }
     report_api(0x5a1d_0004);
+
+    // confirm that the MM signal has changed polarity
+    if coreuser.rf(STATUS_MM) != 0 {
+        // machine mode + invert -> deassert status
+        crate::println!("machine mode output mismatch (user, !inv, != 0): {:x}", coreuser.r(STATUS));
+        passing = 0;
+    }
 
     report_api(0x5a1d_600d);
     passing
