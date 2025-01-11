@@ -9,6 +9,8 @@
 // MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE.
 // Please see the [CERN-OHL- W-2.0] for applicable conditions.
 
+#[cfg(feature = "coreuser-onehot")]
+use utra::coreuser::*;
 #[cfg(feature = "coreuser-lutop")]
 use utra::coreuser::{
     CONTROL, CONTROL_ENABLE, CONTROL_MPP, CONTROL_PRIVILEGE, CONTROL_SHIFT, CONTROL_USE8BIT, STATUS_COREUSER,
@@ -292,6 +294,180 @@ pub fn satp_test() -> usize {
             report_api(coreuser.rf(utra::coreuser::GET_ASID_VALUE_VALUE) << 16 | asid);
         }
     }
+    #[cfg(feature = "coreuser-onehot")]
+    {
+        crate::println!("coreuser one-hot option testing...");
+
+        let mut coreuser = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
+
+        // check if coreuser has the expected value on reset
+        let expected_default = 0b1_0001_1000; // this maps to the `boot0` user, in supervisor mode
+        crate::println!("coreuser expected default test ({:x})", expected_default);
+        if coreuser.r(STATUS) != expected_default {
+            crate::println!("coreuser init fail: {:x} != {:x}", coreuser.r(STATUS), expected_default);
+            passing = 0;
+        }
+
+        crate::println!("coreuser 2bit basic");
+        let mut default = 0x3;
+        // set to 0 so we can safely mask it later on
+        coreuser.wo(USERVALUE, 0);
+        coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, default);
+        let trusted_asids = [(1, 0), (0x17, 1), (0x18, 2), (0x52, 3), (0x57, 2), (1, 0), (1, 0), (0x60, 1)];
+        let asid_fields = [
+            (utra::coreuser::MAP_LO_LUT0, utra::coreuser::USERVALUE_USER0),
+            (utra::coreuser::MAP_LO_LUT1, utra::coreuser::USERVALUE_USER1),
+            (utra::coreuser::MAP_LO_LUT2, utra::coreuser::USERVALUE_USER2),
+            (utra::coreuser::MAP_LO_LUT3, utra::coreuser::USERVALUE_USER3),
+            (utra::coreuser::MAP_HI_LUT4, utra::coreuser::USERVALUE_USER4),
+            (utra::coreuser::MAP_HI_LUT5, utra::coreuser::USERVALUE_USER5),
+            (utra::coreuser::MAP_HI_LUT6, utra::coreuser::USERVALUE_USER6),
+            (utra::coreuser::MAP_HI_LUT7, utra::coreuser::USERVALUE_USER7),
+        ];
+        for (&(asid, value), (map_field, uservalue_field)) in trusted_asids.iter().zip(asid_fields) {
+            coreuser.rmwf(map_field, asid);
+            coreuser.rmwf(uservalue_field, value);
+        }
+
+        coreuser.wo(CONTROL, 0);
+        coreuser.rmwf(CONTROL_ENABLE, 1);
+
+        // set 2-bit with no shift, manual entries
+        if !check_2bit(&trusted_asids, default, true) {
+            passing = 0;
+        };
+
+        // now check MPP bit. should be in machine mode now.
+        crate::println!("coreuser MPP - machine mode");
+        // mpp should be 11 in this test
+        // coreuser.rmwf(CONTROL_INVERT_PRIV, 0); // should already be 0
+        if coreuser.rf(STATUS_MM) != 1 {
+            // machine mode + no invert -> assert status
+            crate::println!("machine mode output mismatch (mm, !inv, != 1)");
+            passing = 0;
+        }
+        coreuser.rmwf(CONTROL_INVERT_PRIV, 1);
+        if coreuser.rf(STATUS_MM) != 0 {
+            // machine mode + invert -> deassert status
+            crate::println!("machine mode output mismatch (mm, inv, != 0)");
+            passing = 0;
+        }
+
+        use riscv::register::mstatus;
+        // set MPP to 0
+        crate::println!("coreuser MPP - user mode");
+        unsafe { mstatus::set_mpp(mstatus::MPP::User) };
+        crate::println!("coreuser MPP user mode rbk {:?}", mstatus::read().mpp());
+        coreuser.rmwf(CONTROL_INVERT_PRIV, 1);
+        if coreuser.rf(STATUS_MM) != 1 {
+            // user mode + invert -> assert status
+            crate::println!("machine mode output mismatch (user, inv, != 1)");
+            passing = 0;
+        }
+        coreuser.rmwf(CONTROL_INVERT_PRIV, 0);
+        if coreuser.rf(STATUS_MM) != 0 {
+            // user mode + no invert -> de-assert status
+            crate::println!("machine mode output mismatch (user, !inv, != 0)");
+            passing = 0;
+        }
+
+        // set MPP to 01
+        crate::println!("coreuser MPP - supervisor mode");
+        unsafe { mstatus::set_mpp(mstatus::MPP::Supervisor) };
+
+        if coreuser.rf(STATUS_MM) != 1 {
+            // supervisor mode + no invert -> assert status
+            crate::println!("machine mode output mismatch (sup, !inv, != 1)");
+            passing = 0;
+        }
+        coreuser.rmwf(CONTROL_INVERT_PRIV, 1);
+        if coreuser.rf(STATUS_MM) != 0 {
+            // supervisor mode + invert -> de-assert status
+            crate::println!("machine mode output mismatch (sup, inv, !=0)");
+            passing = 0;
+        }
+
+        crate::println!("coreuser MPP - return to machine mode");
+        unsafe { mstatus::set_mpp(mstatus::MPP::Machine) };
+
+        // do some pseudorandom values into the table + shift values
+        let mut random_asids = [(0u32, 0u32); 8];
+        let mut state = 0xface_f001;
+        for i in 0..7 {
+            crate::println!("coreuser rand {}", i);
+            // pick a random default
+            state = lfsr_next_u32(state);
+            default = state & 0x3;
+            coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, default);
+
+            for (asid, val) in random_asids.iter_mut() {
+                state = lfsr_next_u32(state);
+                *asid = state & 0xFF;
+                state = lfsr_next_u32(state);
+                *val = state & 0x3;
+            }
+            for (&(asid, value), (map_field, uservalue_field)) in random_asids.iter().zip(asid_fields) {
+                coreuser.rmwf(map_field, asid);
+                coreuser.rmwf(uservalue_field, value);
+            }
+            default = lfsr_next_u32(state) & 0x3;
+            coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, default);
+            if !check_2bit(&random_asids, default, true) {
+                passing = 0;
+            };
+        }
+
+        // restore some sanity
+        for (&(asid, value), (map_field, uservalue_field)) in trusted_asids.iter().zip(asid_fields) {
+            coreuser.rmwf(map_field, asid);
+            coreuser.rmwf(uservalue_field, value);
+        }
+        let fixed_default = 0;
+        coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, fixed_default);
+        coreuser.rmwf(CONTROL_INVERT_PRIV, 0);
+
+        crate::println!("coreuser protect test");
+        // turn off updates
+        coreuser.wo(utra::coreuser::PROTECT, 1);
+
+        // tries to "turn off" protect, but it should do nothing
+        coreuser.wo(utra::coreuser::PROTECT, 0);
+
+        // check that coreuser mapping is as expected
+        if !check_2bit(&trusted_asids, fixed_default, true) {
+            passing = 0;
+        };
+
+        // now try to update mapping
+        state = lfsr_next_u32(state);
+
+        for (asid, val) in random_asids.iter_mut() {
+            state = lfsr_next_u32(state);
+            *asid = state & 0xFF;
+            state = lfsr_next_u32(state);
+            *val = state & 0x3;
+        }
+        for (&(asid, value), (map_field, uservalue_field)) in random_asids.iter().zip(asid_fields) {
+            coreuser.rmwf(map_field, asid);
+            coreuser.rmwf(uservalue_field, value);
+        }
+        // pick a value we definitely know is different from `fixed_default` of 0
+        default = 1;
+        coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, default);
+
+        // now check that the mapping was not updated
+        crate::println!("+test");
+        if !check_2bit(&trusted_asids, fixed_default, true) {
+            // positive check that the mapping is there
+            passing = 0;
+        };
+        crate::println!("-test");
+        if check_2bit(&random_asids, default, false) {
+            // negative check that the new mapping is not there
+            crate::println!("mappings were updated when they shouldn't be!");
+            passing = 0;
+        };
+    }
     #[cfg(feature = "coreuser-lutop")]
     {
         crate::println!("coruser LUT option testing...");
@@ -549,4 +725,73 @@ fn check_2bit(lut: &[(u32, u32); 8], shift: usize, default: u32) -> bool {
     }
 
     passing
+}
+
+/// returns `true` if pass
+#[cfg(feature = "coreuser-onehot")]
+fn check_2bit(lut: &[(u32, u32); 8], default: u32, print_fail: bool) -> bool {
+    let verbose = false;
+    let coreuser: CSR<u32> = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
+    let mut passing = true;
+
+    for asid in 0..512 {
+        let satp: u32 = 0x8000_0000 | asid << 22 | (ROOT_PT_PA as u32 >> 12);
+        unsafe {
+            core::arch::asm!(
+                "csrw        satp, {satp_val}",
+                "sfence.vma",
+                satp_val = in(reg) satp,
+            );
+        }
+        let rbk = coreuser.rf(STATUS_COREUSER);
+        if lut.iter().any(|&(test_asid, _value)| test_asid == asid) {
+            let mut found = false;
+            for &(test_asid, value) in lut.iter() {
+                if asid == test_asid {
+                    found = true;
+                    let checkval = generate_coreuser(value as u32);
+                    if rbk != checkval {
+                        crate::println!(
+                            "coreuser fail match@{}: {:x}, got {:x} ({:x})",
+                            asid,
+                            checkval,
+                            rbk,
+                            value
+                        );
+                        passing = false;
+                    } else {
+                        if verbose {
+                            crate::println!("coreuser 2-bit match success {} -> {}", asid, rbk);
+                        }
+                    }
+                }
+            }
+            assert!(found, "ASID was not found in test set when it should have been!");
+        } else {
+            let checkval = generate_coreuser(default);
+            if rbk != checkval {
+                if print_fail {
+                    crate::println!(
+                        "coreuser 2-bit match miss failed to map on {} to default: {:x} got {:x}",
+                        asid,
+                        checkval,
+                        rbk,
+                    );
+                }
+                passing = false;
+            }
+        }
+    }
+
+    passing
+}
+
+#[cfg(feature = "coreuser-onehot")]
+fn generate_coreuser(value: u32) -> u32 {
+    ((1 << value) << 4)
+    // form LSB
+    | ((((1 << value) & 0b1000) >> 3)
+    | (((1 << value) & 0b0100) >> 1)
+    | (((1 << value) & 0b0010) << 1)
+    | (((1 << value) & 0b0001) << 3))
 }

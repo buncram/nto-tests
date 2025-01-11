@@ -42,6 +42,7 @@ debug-irq = []
 bio-mul = ["xous-bio-bdma/bio-mul"]
 coreuser-compression = []           # this feature is not used
 coreuser-lutop = []
+coreuser-onehot = []
 pio = []
 
 # legacy tests
@@ -68,7 +69,7 @@ udma-tests = []
 cam-tests = []
 lifecycle-tests = []
 
-default = ["fast-fclk", "coreuser-lutop"]
+default = ["fast-fclk", "coreuser-onehot"]
 
 [target.'cfg(not(any(windows, unix)))'.dependencies]
 utralib = { path = "../utralib" }
