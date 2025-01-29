@@ -125,8 +125,15 @@ impl TestRunner for CamTests {
             crate::println!("time passes...");
         }
 
+        // Pixel pipe needs time to clear, use multiple writes to cause the necessary delay
+        tc.csr_mut().wo(REG_CAM_CFG_GLOB, 0x400);
+        tc.csr_mut().wo(REG_CAM_CFG_GLOB, 0x400);
+        tc.csr_mut().wo(REG_CAM_CFG_GLOB, 0x400);
         for i in 0..2 {
             unsafe { tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16) }
+            // this register needs to be read before written to reliably restart the pipe
+            let _ = tc.csr().r(utra::udma_camera::REG_CAM_CFG_GLOB);
+            tc.csr_mut().wo(REG_CAM_CFG_GLOB, 0x8000_0400);
             // while tc.udma_busy(Bank::Rx) {}
             while (tc.csr.r(REG_CAM_CFG_GLOB) & 0x8000_0000) != 0 {}
             crate::println!("frame {} done", i + 2);
@@ -152,6 +159,16 @@ impl TestRunner for CamTests {
         crate::println!("legacy frame 2 done");
 
         // setup interrupts
+        crate::println!("Continuous + interrupt driven");
+        // drain the previous data
+        tc.csr_mut().wo(REG_CAM_CFG_GLOB, 0x400);
+        tc.csr_mut().wo(REG_CAM_CFG_GLOB, 0x400);
+        tc.csr_mut().wo(REG_CAM_CFG_GLOB, 0x400);
+
+        // this one is continuous so it never has to be re-initiated
+        unsafe { tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16 | CFG_CONT) }
+        // dummy read is necessary to drain the Tx FIFO
+        let _ = tc.csr().r(utra::udma_camera::REG_CAM_CFG_GLOB);
         // re-enable frame sync for rx start
         let global = tc.csr().ms(CFG_FRAMEDROP_EN, 0)
             | tc.csr().ms(CFG_FORMAT, Format::BypassLe as u32)
@@ -164,11 +181,7 @@ impl TestRunner for CamTests {
         let mut irq8 = CSR::<u32>::new(utra::irqarray8::HW_IRQARRAY8_BASE as *mut u32);
         // clear any pending interrupts
         irq8.wo(utra::irqarray8::EV_PENDING, 0xFFFF);
-
-        // this one is continuous so it never has to be re-initiated
-        crate::println!("Continuous + interrupt driven");
-        unsafe { tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16 | CFG_CONT) }
-        
+       
         for i in 0..2 {
             while irq8.rf(utra::irqarray8::EV_PENDING_CAM_RX) == 0 {}
             // clear pending
