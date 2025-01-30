@@ -122,7 +122,7 @@ impl UdmaTests {
         let i2c_ifram =
             unsafe { cramium_hal::ifram::IframRange::from_raw_parts(I2C_IFRAM_ADDR, I2C_IFRAM_ADDR, 4096) };
         let mut i2c = unsafe {
-            cramium_hal::udma::I2c::new_with_ifram(i2c_channel, 100_000, perclk, i2c_ifram, &udma_global)
+            cramium_hal::udma::I2c::new_with_ifram(i2c_channel, 50_000, perclk, i2c_ifram, &udma_global)
         };
 
         crate::println!("i2c test");
