@@ -83,12 +83,12 @@ pub fn sce_dma_tests() -> usize {
 
     // dma the data in region_a to the hash engine; device should automatically ensure no buffers are
     // overfilled
-    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_SFR_XCH_AXSTART, region_a.as_ptr() as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_OPT_SFR_XCH_OPT, 0b1_0000); // endian swap
-    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_SFR_XCH_SEGID, 4); // HASH_MSG region
+    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_XCHCR_AXSTART, region_a.as_ptr() as u32);
+    sdma_csr.wfo(utra::scedma::SFR_XCH_OPT_XCHCR_OPT, 0b1_0000); // endian swap
+    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_XCHCR_SEGID, 4); // HASH_MSG region
     sdma_csr.wfo(utra::scedma::SFR_XCH_SEGSTART_XCHCR_SEGSTART, 0);
     sdma_csr.wfo(utra::scedma::SFR_XCH_TRANSIZE_XCHCR_TRANSIZE, DMA_LEN as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_FUNC_SFR_XCH_FUNC, 0); // 0 == AXI read, 1 == AXI write
+    sdma_csr.wfo(utra::scedma::SFR_SCH_FUNC_SCHCR_FUNC, 0); // 0 == AXI read, 1 == AXI write
     sdma_csr.wfo(utra::scedma::SFR_SCHSTART_AR_SFR_SCHSTART_AR, 0xA5); // 0x5a ich start, 0xa5 xch start, 0xaa sch start
 
     // observe the hash done output
@@ -166,11 +166,11 @@ pub fn sce_dma_tests() -> usize {
     aes_csr.wo(utra::aes::SFR_AR, 0x5a);
 
     // dma the data in region_a to the AES engine
-    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_SFR_XCH_AXSTART, region_a.as_ptr() as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_SFR_XCH_SEGID, 14); // 13 AKEY, 14 AIB, 15, AOB
+    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_XCHCR_AXSTART, region_a.as_ptr() as u32);
+    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_XCHCR_SEGID, 14); // 13 AKEY, 14 AIB, 15, AOB
     sdma_csr.wfo(utra::scedma::SFR_XCH_SEGSTART_XCHCR_SEGSTART, 0);
     sdma_csr.wfo(utra::scedma::SFR_XCH_TRANSIZE_XCHCR_TRANSIZE, DMA_LEN as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_FUNC_SFR_XCH_FUNC, 0); // 0 == AXI read, 1 == AXI write
+    sdma_csr.wfo(utra::scedma::SFR_SCH_FUNC_SCHCR_FUNC, 0); // 0 == AXI read, 1 == AXI write
     sdma_csr.wfo(utra::scedma::SFR_SCHSTART_AR_SFR_SCHSTART_AR, 0xA5); // 0x5a ich start, 0xa5 xch start, 0xaa sch start
 
     uart.tiny_write_str("scdma op 1 in progress\r"); // waste some time while the DMA runs...
@@ -188,11 +188,11 @@ pub fn sce_dma_tests() -> usize {
     // }
 
     // dma the data in region_b from the segment
-    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_SFR_XCH_AXSTART, region_b.as_ptr() as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_SFR_XCH_SEGID, 15);
+    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_XCHCR_AXSTART, region_b.as_ptr() as u32);
+    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_XCHCR_SEGID, 15);
     sdma_csr.wfo(utra::scedma::SFR_XCH_SEGSTART_XCHCR_SEGSTART, 0);
     sdma_csr.wfo(utra::scedma::SFR_XCH_TRANSIZE_XCHCR_TRANSIZE, DMA_LEN as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_FUNC_SFR_XCH_FUNC, 1); // 0 == AXI read, 1 == AXI write
+    sdma_csr.wfo(utra::scedma::SFR_SCH_FUNC_SCHCR_FUNC, 1); // 0 == AXI read, 1 == AXI write
     sdma_csr.wfo(utra::scedma::SFR_SCHSTART_AR_SFR_SCHSTART_AR, 0xA5); // 0x5a ich start, 0xa5 xch start, 0xaa sch start
     uart.tiny_write_str("scdma op 2 in progress\r"); // waste some time while the DMA runs...
 
@@ -218,11 +218,11 @@ pub fn sce_dma_tests() -> usize {
     aes_csr.wfo(utra::aes::SFR_CRFUNC_SFR_CRFUNC, 0x2); // AES-DEC
 
     // dma the data in region_a to the AES engine
-    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_SFR_XCH_AXSTART, region_b.as_ptr() as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_SFR_XCH_SEGID, 14); // 13 AKEY, 14 AIB, 15, AOB
+    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_XCHCR_AXSTART, region_b.as_ptr() as u32);
+    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_XCHCR_SEGID, 14); // 13 AKEY, 14 AIB, 15, AOB
     sdma_csr.wfo(utra::scedma::SFR_XCH_SEGSTART_XCHCR_SEGSTART, 0);
     sdma_csr.wfo(utra::scedma::SFR_XCH_TRANSIZE_XCHCR_TRANSIZE, DMA_LEN as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_FUNC_SFR_XCH_FUNC, 0); // 0 == AXI read, 1 == AXI write
+    sdma_csr.wfo(utra::scedma::SFR_SCH_FUNC_SCHCR_FUNC, 0); // 0 == AXI read, 1 == AXI write
     sdma_csr.wfo(utra::scedma::SFR_SCHSTART_AR_SFR_SCHSTART_AR, 0xA5); // 0x5a ich start, 0xa5 xch start, 0xaa sch start
 
     // start the AES op
@@ -232,11 +232,11 @@ pub fn sce_dma_tests() -> usize {
     uart.tiny_write_str("scdma op 3 in progress\r"); // waste some time while the DMA runs...
 
     // dma the data in region_b from the segment
-    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_SFR_XCH_AXSTART, region_c.as_ptr() as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_SFR_XCH_SEGID, 15);
+    sdma_csr.wfo(utra::scedma::SFR_XCH_AXSTART_XCHCR_AXSTART, region_c.as_ptr() as u32);
+    sdma_csr.wfo(utra::scedma::SFR_XCH_SEGID_XCHCR_SEGID, 15);
     sdma_csr.wfo(utra::scedma::SFR_XCH_SEGSTART_XCHCR_SEGSTART, 0);
     sdma_csr.wfo(utra::scedma::SFR_XCH_TRANSIZE_XCHCR_TRANSIZE, DMA_LEN as u32);
-    sdma_csr.wfo(utra::scedma::SFR_XCH_FUNC_SFR_XCH_FUNC, 1); // 0 == AXI read, 1 == AXI write
+    sdma_csr.wfo(utra::scedma::SFR_SCH_FUNC_SCHCR_FUNC, 1); // 0 == AXI read, 1 == AXI write
     sdma_csr.wfo(utra::scedma::SFR_SCHSTART_AR_SFR_SCHSTART_AR, 0xA5); // 0x5a ich start, 0xa5 xch start, 0xaa sch start
     uart.tiny_write_str("scdma op 4 in progress\r"); // waste some time while the DMA runs...
 
