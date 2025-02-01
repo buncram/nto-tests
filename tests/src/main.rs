@@ -159,7 +159,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut byte_strobe_tests = ramtests::ByteStrobeTests::new(false);
     let mut xip_tests = ramtests::XipTests::new(false);
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
-    let mut pl230_tests = pl230::Pl230Tests::new(false);
+    let mut pl230_tests = pl230::Pl230Tests::new(cfg!(feature = "pl230-tests"));
 
     let mut tests: [&mut dyn Test; 22] = [
         &mut reset_value_test,

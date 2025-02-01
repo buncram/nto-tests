@@ -20,6 +20,7 @@ xous-bio-bdma = { path = "../../xous-core/libs/xous-bio-bdma", default-features 
 xous-pl230 = { path = "../../xous-core/libs/xous-pl230", default-features = false, features = [
     "tests",
     "cramium-soc",
+    "dma-mainram",
     "baremetal",
 ] }
 cramium-hal = { path = "../../xous-core/libs/cramium-hal", features = [
@@ -68,6 +69,7 @@ rram-tests = []
 udma-tests = []
 cam-tests = []
 lifecycle-tests = []
+pl230-tests = []
 
 default = ["fast-fclk", "coreuser-onehot"]
 
