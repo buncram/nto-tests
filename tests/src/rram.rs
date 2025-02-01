@@ -418,19 +418,58 @@ impl TestRunner for RramLifecycle {
     fn run(&mut self) { self.passing_tests += rram_lockzones(); }
 }
 
+
+/*
+
+# Key cases are striped as follows:
+#   bank     user  rd   wr    wrena
+#   0          1   ena  ena   false
+#   1          2   ena  ena   false
+#   2          4   ena  ena   false
+#   3          8   ena  ena   false
+#   4          1   dis  ena   false
+#   5          2   dis  ena   false
+#   6          4   dis  ena   false
+#   7          8   dis  ena   false
+#   8          1   ena  dis   false
+#   9          2   ena  dis   false
+#   10         4   ena  dis   false
+#   11         8   ena  dis   false
+#   12         1   dis  dis   false
+#   13         2   dis  dis   false
+#   14         4   dis  dis   false
+#   15         8   dis  dis   false
+# (repeat but with wrena = true, 16-31)
+
+*/
+
 pub fn rram_lockzones() -> usize {
     let mut reram = Reram::new();
     let cases = [
-        ("keysel", KEYSEL_START),
-        ("datasel", DATASEL_START),
+        ("keysel0", KEYSEL_START + 0 * 32),
+        ("keysel1", KEYSEL_START + 1 * 32),
+        ("keysel2", KEYSEL_START + 2 * 32),
+        ("keysel3", KEYSEL_START + 3 * 32),
+        // ("keysel0rw", KEYSEL_START + 0 * 32 * 4),
+        ("keysel0Rw", KEYSEL_START + 1 * 32 * 4),
+        ("keysel0rW", KEYSEL_START + 2 * 32 * 4),
+        ("keysel0RW", KEYSEL_START + 3 * 32 * 4),
+        ("datasel0", DATASEL_START + 0 * 32),
+        ("datasel1", DATASEL_START + 1 * 32),
+        ("datasel2", DATASEL_START + 2 * 32),
+        ("datasel3", DATASEL_START + 3 * 32),
         ("codesel", CODESEL_END - 0x1000),
         ("acram", ACRAM_START),
     ];
-    for i in 1..3 {
+    for i in 1..2 {
         for &(case, base) in cases.iter() {
-            crate::println!("{} base: @{:x} -> {:x}", case, base, unsafe {
-                (base as *mut u32).read_volatile()
-            });
+            crate::print!("{} base: @{:x} -> ", case, base);
+            for j in 0..8 {
+                crate::print!("{:08x} ", unsafe {
+                    (base as *mut u32).add(j).read_volatile()
+                });
+            }
+            crate::println!("");
             // has to write in 4's
             let mut testdata = [0u32; 8];
             for (j, d) in testdata.iter_mut().enumerate() {
@@ -440,9 +479,13 @@ pub fn rram_lockzones() -> usize {
                 reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &testdata);
             }
             cache_flush();
-            crate::println!("{} poke{} {:x}: {:x}", case, i, base, unsafe {
-                (base as *mut u32).read_volatile()
-            });
+            crate::print!("{}  rbk: @{:x} -> ", case, base);
+            for j in 0..8 {
+                crate::print!("{:08x} ", unsafe {
+                    (base as *mut u32).add(j).read_volatile()
+                });
+            }
+            crate::println!("");
         }
     }
 
