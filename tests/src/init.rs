@@ -135,7 +135,7 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         daric_cgu.add(sysctrl::SFR_CGUSEL1.offset()).write_volatile(1); // 0: RC, 1: XTAL
         daric_cgu.add(sysctrl::SFR_CGUFSCR.offset()).write_volatile(48); // external crystal is 48MHz
         daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
-    
+
         daric_cgu
             .add(sysctrl::SFR_IPCLPEN.offset())
             .write_volatile(daric_cgu.add(sysctrl::SFR_IPCLPEN.offset()).read_volatile() & !0x02);
@@ -200,6 +200,13 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_4.offset()).write_volatile(0x070f); // pclk
         // perclk divider - set to divide by 8 off of an 800Mhz base. Only found on NTO.
         daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x03_ff_ff);
+
+        // turn off gates
+        daric_cgu.add(utra::sysctrl::SFR_ACLKGR.offset()).write_volatile(0);
+        daric_cgu.add(utra::sysctrl::SFR_HCLKGR.offset()).write_volatile(0);
+        daric_cgu.add(utra::sysctrl::SFR_ICLKGR.offset()).write_volatile(0);
+        daric_cgu.add(utra::sysctrl::SFR_PCLKGR.offset()).write_volatile(0);
+
         // commit dividers
         daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
     }
