@@ -1994,18 +1994,18 @@ position to clear the flag]]></description>
                     </fields>
                 </register>
                 <register>
-                    <name>SFR_WDATABYPASS_MODE</name>
+                    <name>SFR_SCH_FUNC</name>
                     <description><![CDATA[See file:///F:/code/cram-nto/modules/crypto_top/rtl/scedma.sv]]></description>
                     <addressOffset>0x0030</addressOffset>
                     <resetValue>0x00</resetValue>
                     <size>32</size>
                     <fields>
                         <field>
-                            <name>sfr_wdatabypass_mode</name>
-                            <msb>1</msb>
-                            <bitRange>[1:0]</bitRange>
+                            <name>schcr_func</name>
+                            <msb>0</msb>
+                            <bitRange>[0:0]</bitRange>
                             <lsb>0</lsb>
-                            <description><![CDATA[sfr_wdatabypass_mode read/write control register]]></description>
+                            <description><![CDATA[schcr_func read/write control register]]></description>
                         </field>
                     </fields>
                 </register>
@@ -2026,18 +2026,18 @@ position to clear the flag]]></description>
                     </fields>
                 </register>
                 <register>
-                    <name>SFR_WDATABYPASS_DATA</name>
+                    <name>SFR_SCH_AXSTART</name>
                     <description><![CDATA[See file:///F:/code/cram-nto/modules/crypto_top/rtl/scedma.sv]]></description>
                     <addressOffset>0x0038</addressOffset>
                     <resetValue>0x00</resetValue>
                     <size>32</size>
                     <fields>
                         <field>
-                            <name>sfr_wdatabypass_data</name>
+                            <name>schcr_axstart</name>
                             <msb>31</msb>
                             <bitRange>[31:0]</bitRange>
                             <lsb>0</lsb>
-                            <description><![CDATA[sfr_wdatabypass_data read/write control register]]></description>
+                            <description><![CDATA[schcr_axstart read/write control register]]></description>
                         </field>
                     </fields>
                 </register>
@@ -2169,10 +2169,42 @@ position to clear the flag]]></description>
                         </field>
                     </fields>
                 </register>
+                <register>
+                    <name>SFR_WDATABYPASS_MODE</name>
+                    <description><![CDATA[See file:///F:/code/cram-nto/modules/crypto_top/rtl/scedma.sv]]></description>
+                    <addressOffset>0x0070</addressOffset>
+                    <resetValue>0x00</resetValue>
+                    <size>32</size>
+                    <fields>
+                        <field>
+                            <name>sfr_wdatabypass_mode</name>
+                            <msb>1</msb>
+                            <bitRange>[1:0]</bitRange>
+                            <lsb>0</lsb>
+                            <description><![CDATA[sfr_wdatabypass_mode read/write control register]]></description>
+                        </field>
+                    </fields>
+                </register>
+                <register>
+                    <name>SFR_WDATABYPASS_DATA</name>
+                    <description><![CDATA[See file:///F:/code/cram-nto/modules/crypto_top/rtl/scedma.sv]]></description>
+                    <addressOffset>0x0074</addressOffset>
+                    <resetValue>0x00</resetValue>
+                    <size>32</size>
+                    <fields>
+                        <field>
+                            <name>sfr_wdatabypass_data</name>
+                            <msb>31</msb>
+                            <bitRange>[31:0]</bitRange>
+                            <lsb>0</lsb>
+                            <description><![CDATA[sfr_wdatabypass_data read/write control register]]></description>
+                        </field>
+                    </fields>
+                </register>
             </registers>
             <addressBlock>
                 <offset>0</offset>
-                <size>0x64</size>
+                <size>0x78</size>
                 <usage>registers</usage>
             </addressBlock>
         </peripheral>
@@ -3519,7 +3551,7 @@ position to clear the flag]]></description>
                             <msb>7</msb>
                             <bitRange>[7:0]</bitRange>
                             <lsb>0</lsb>
-                            <description><![CDATA[sfr_aclkgr read/write control register]]></description>
+                            <description><![CDATA[sfr_aclkgr read only status register]]></description>
                         </field>
                     </fields>
                 </register>
@@ -3535,7 +3567,7 @@ position to clear the flag]]></description>
                             <msb>7</msb>
                             <bitRange>[7:0]</bitRange>
                             <lsb>0</lsb>
-                            <description><![CDATA[sfr_hclkgr read/write control register]]></description>
+                            <description><![CDATA[sfr_hclkgr read only status register]]></description>
                         </field>
                     </fields>
                 </register>
@@ -3551,7 +3583,7 @@ position to clear the flag]]></description>
                             <msb>7</msb>
                             <bitRange>[7:0]</bitRange>
                             <lsb>0</lsb>
-                            <description><![CDATA[sfr_iclkgr read/write control register]]></description>
+                            <description><![CDATA[sfr_iclkgr read only status register]]></description>
                         </field>
                     </fields>
                 </register>
@@ -3567,7 +3599,7 @@ position to clear the flag]]></description>
                             <msb>7</msb>
                             <bitRange>[7:0]</bitRange>
                             <lsb>0</lsb>
-                            <description><![CDATA[sfr_pclkgr read/write control register]]></description>
+                            <description><![CDATA[sfr_pclkgr read only status register]]></description>
                         </field>
                     </fields>
                 </register>
@@ -3880,6 +3912,13 @@ respective bit position to clear the flag]]></description>
                             <bitRange>[7:7]</bitRange>
                             <lsb>7</lsb>
                             <description><![CDATA[disable_filter_mem read/write control register]]></description>
+                        </field>
+                        <field>
+                            <name>clocking_mode</name>
+                            <msb>9</msb>
+                            <bitRange>[9:8]</bitRange>
+                            <lsb>8</lsb>
+                            <description><![CDATA[clocking_mode read/write control register]]></description>
                         </field>
                     </fields>
                 </register>
