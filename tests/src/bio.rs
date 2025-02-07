@@ -19,7 +19,7 @@ const BIO_TESTS: usize =
     // dma
     + 4 * 5 + 1
     // clocking modes
-    + 4 + 4 + 4 + 4
+    + 4 + 4 + 4 + 4 + 2
     // stack test
     + 1
     // hello word, hello multiverse, aclk_tests
@@ -82,16 +82,18 @@ impl TestRunner for BioTests {
         self.passing_tests += bio_tests::dma::dma_basic(true, 0); // 4
         self.passing_tests += bio_tests::dma::dma_bytes(); // 4
         self.passing_tests += bio_tests::dma::dma_u16(); // 4
-        self.passing_tests += bio_tests::dma::dma_multicore(); // 1
+        self.passing_tests += bio_tests::dma::dma_multicore(0); // 1
         self.passing_tests += bio_tests::dma::dma_coincident(0); // 4
 
         // test clocking modes
         crate::println!("*** CLKMODE 1 ***");
         self.passing_tests += bio_tests::dma::dma_basic(true, 1); // 4
         self.passing_tests += bio_tests::dma::dma_coincident(1); // 4
+        self.passing_tests += bio_tests::dma::dma_multicore(1); // 1
         crate::println!("*** CLKMODE 3 ***");
         self.passing_tests += bio_tests::dma::dma_basic(true, 3); // 4
         self.passing_tests += bio_tests::dma::dma_coincident(3); // 4
+        self.passing_tests += bio_tests::dma::dma_multicore(3); // 1
 
         self.passing_tests += bio_tests::units::aclk_tests();
 
