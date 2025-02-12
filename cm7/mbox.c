@@ -230,6 +230,8 @@ void Reset_Handler(void) {
     for (int i = 0; i < 1000; i++) {
         print_string("Hello from CM7!\r");
     } */
+    *((unsigned int *) 0x40014004) = 5;
+    *((unsigned int *) 0x40014008) = 5;
     NVIC_SetPriority(MBOX_AVAIL_NVIC, 1);
     NVIC_EnableIRQ(MBOX_AVAIL_NVIC);
     NVIC_SetPriority(MBOX_ABORT_NVIC, 1);
