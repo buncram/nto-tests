@@ -202,11 +202,10 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x03_ff_ff);
 
         // turn off gates
-        daric_cgu.add(utra::sysctrl::SFR_ACLKGR.offset()).write_volatile(0);
-        daric_cgu.add(utra::sysctrl::SFR_HCLKGR.offset()).write_volatile(0);
-        daric_cgu.add(utra::sysctrl::SFR_ICLKGR.offset()).write_volatile(0);
-        daric_cgu.add(utra::sysctrl::SFR_PCLKGR.offset()).write_volatile(0);
-
+        daric_cgu.add(utra::sysctrl::SFR_ACLKGR.offset()).write_volatile(0x2f);
+        daric_cgu.add(utra::sysctrl::SFR_HCLKGR.offset()).write_volatile(0xff);
+        daric_cgu.add(utra::sysctrl::SFR_ICLKGR.offset()).write_volatile(0x8f);
+        daric_cgu.add(utra::sysctrl::SFR_PCLKGR.offset()).write_volatile(0xff);
         // commit dividers
         daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
     }

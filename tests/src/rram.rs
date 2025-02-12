@@ -444,9 +444,6 @@ impl TestRunner for RramLifecycle {
 
 pub fn rram_lockzones() -> usize {
     let mut reram = Reram::new();
-    // enable all error detection
-    reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
-
     let cases = [
         ("keyselu0", KEYSEL_START + 0 * 32),
         ("keyselu1", KEYSEL_START + 1 * 32),
@@ -467,6 +464,8 @@ pub fn rram_lockzones() -> usize {
     ];
     for i in 1..2 {
         for (k, &(case, base)) in cases.iter().enumerate() {
+            // enable all error detection
+            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
             crate::print!("{} base: @{:x} -> ", case, base);
             for j in 0..8 {
                 crate::print!("{:08x} ", unsafe { (base as *mut u32).add(j).read_volatile() });
@@ -481,6 +480,8 @@ pub fn rram_lockzones() -> usize {
                 reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &testdata);
             }
             cache_flush();
+            // enable all error detection - must be re-enabled after the write operation
+            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
             crate::print!("{}  rbk: @{:x} -> ", case, base);
             for j in 0..8 {
                 crate::print!("{:08x} ", unsafe { (base as *mut u32).add(j).read_volatile() });
