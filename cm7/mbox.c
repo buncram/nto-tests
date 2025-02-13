@@ -671,6 +671,12 @@ void main_loop() {
 #else
     ticksDelay(10000);
     print_string("CM7 up\r\r");
+    print_string("cache config: ");
+    send_u32_hex(CCR);
+    SCB_EnableICache();
+    SCB_EnableDCache();
+    print_string("cache config: ");
+    send_u32_hex(CCR);
 #endif
     enable_fpu();
 
