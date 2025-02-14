@@ -539,95 +539,133 @@ fn acram_default(offset: usize) -> u32 {
     value
 }
 
+const ROOT_PT_PA: usize = 0x6100_0000; // 1st level at base of sram
 pub fn rram_lockzones() -> usize {
     let mut reram = Reram::new();
     let mut passing = 0;
 
     let coreuser: CSR<u32> = CSR::new(utra::coreuser::HW_COREUSER_BASE as *mut u32);
-    // extract the current coreuser ID so we can know if we should be accessing the data or not
-    let user_id = coreuser.rf(utra::coreuser::STATUS_COREUSER) >> 4;
+    let mut default = 0x3;
+    // set to 0 so we can safely mask it later on
+    coreuser.wo(utra::coreuser::USERVALUE, 0);
+    coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, default);
+    // straightforward mapping; creative mappings are tested elsewhere
+    let trusted_asids = [(1, 0), (2, 1), (3, 2), (4, 3), (1, 0), (1, 0), (1, 0), (1, 0)];
+    let asid_fields = [
+        (utra::coreuser::MAP_LO_LUT0, utra::coreuser::USERVALUE_USER0),
+        (utra::coreuser::MAP_LO_LUT1, utra::coreuser::USERVALUE_USER1),
+        (utra::coreuser::MAP_LO_LUT2, utra::coreuser::USERVALUE_USER2),
+        (utra::coreuser::MAP_LO_LUT3, utra::coreuser::USERVALUE_USER3),
+        (utra::coreuser::MAP_HI_LUT4, utra::coreuser::USERVALUE_USER4),
+        (utra::coreuser::MAP_HI_LUT5, utra::coreuser::USERVALUE_USER5),
+        (utra::coreuser::MAP_HI_LUT6, utra::coreuser::USERVALUE_USER6),
+        (utra::coreuser::MAP_HI_LUT7, utra::coreuser::USERVALUE_USER7),
+    ];
+    for (&(asid, value), (map_field, uservalue_field)) in trusted_asids.iter().zip(asid_fields) {
+        coreuser.rmwf(map_field, asid);
+        coreuser.rmwf(uservalue_field, value);
+    }
+
+    coreuser.wo(utra::coreuser::CONTROL, 0);
+    coreuser.rmwf(utra::coreuser::CONTROL_ENABLE, 1);
+
     let hmac_ok = false;
     let mut check_array = [0u32; 8];
-    for (_k, &(case, base)) in CASES.iter().enumerate() {
-        // enable all error detection
-        reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
 
-        // attempt to read data
-        let slice = unsafe { core::slice::from_raw_parts(base as *mut u32, 8) };
-        check_array.copy_from_slice(slice);
-        crate::print!("{} base: @{:x} -> ", case, base);
-        for (index, &data) in check_array.iter().enumerate() {
-            let offset = base + index * size_of::<u32>();
-            let expected = match case_region(offset) {
-                AccessRegion::Key => {
-                    // first two slots are always readable
-                    if hmac_ok || ((offset & 0xFFFF) < 0x40) {
-                        if case_readable(offset) {
-                            if case_user_id(offset) == user_id { key_default(offset) } else { 0 }
+    for test_user in 1..=4 {
+        // set the ASID, which updates the coreuser value
+        let satp: u32 = 0x8000_0000 | test_user << 22 | (ROOT_PT_PA as u32 >> 12);
+        unsafe {
+            core::arch::asm!(
+                "csrw        satp, {satp_val}",
+                "sfence.vma",
+                satp_val = in(reg) satp,
+            );
+        }
+        // extract the current coreuser ID so we can know if we should be accessing the data or not
+        let user_id = coreuser.rf(utra::coreuser::STATUS_COREUSER) >> 4;
+        crate::println!("*** Checking user_id: {:x}");
+        for (_k, &(case, base)) in CASES.iter().enumerate() {
+            // enable all error detection
+            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+
+            // attempt to read data
+            let slice = unsafe { core::slice::from_raw_parts(base as *mut u32, 8) };
+            check_array.copy_from_slice(slice);
+            crate::print!("{} base: @{:x} -> ", case, base);
+            for (index, &data) in check_array.iter().enumerate() {
+                let offset = base + index * size_of::<u32>();
+                let expected = match case_region(offset) {
+                    AccessRegion::Key => {
+                        // first two slots are always readable
+                        if hmac_ok || ((offset & 0xFFFF) < 0x40) {
+                            if case_readable(offset) {
+                                if case_user_id(offset) == user_id { key_default(offset) } else { 0 }
+                            } else {
+                                0
+                            }
                         } else {
                             0
                         }
-                    } else {
-                        0
                     }
-                }
-                AccessRegion::Data => {
-                    if case_readable(offset) {
-                        if case_user_id(offset) == user_id { data_default(offset) } else { 0 }
-                    } else {
-                        0
-                    }
-                }
-                AccessRegion::Acram => acram_default(offset),
-                _ => 0,
-            };
-            if expected == data {
-                crate::print!("{:08x} ", data);
-                passing += 1;
-            } else {
-                crate::print!("(e){:08x}(g){:08x} ", expected, data);
-            }
-        }
-        crate::println!("");
-
-        /*
-        // has to write in 4's
-        let mut testdata = [0u32; 8];
-        for (j, d) in testdata.iter_mut().enumerate() {
-            *d = (j + k * 0x100) as u32;
-        }
-        unsafe {
-            reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &testdata);
-        }
-        cache_flush();
-        // enable all error detection - must be re-enabled after the write operation
-        reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
-        for (index, &data) in check_array.iter().enumerate() {
-            let offset = base + index * size_of::<u32>();
-            let expected = if case_writeable(offset) {
-                testdata[index]
-            } else {
-                // default data modulo access controls
-                match case_region(offset) {
-                    // key region is currently blocked because HMAC is not setup
-                    AccessRegion::Key => 0,
                     AccessRegion::Data => {
                         if case_readable(offset) {
-                            data_default(offset)
+                            if case_user_id(offset) == user_id { data_default(offset) } else { 0 }
                         } else {
                             0
                         }
                     }
                     AccessRegion::Acram => acram_default(offset),
                     _ => 0,
+                };
+                if expected == data {
+                    crate::print!("{:08x} ", data);
+                    passing += 1;
+                } else {
+                    crate::print!("(e){:08x}(g){:08x} ", expected, data);
                 }
-            };
-            if expected == data {
-                passing += 1;
-            } else {
-                crate::println!("wr mismatch: want {:08x}, got {:08x}", expected, data);
             }
-        } */
+            crate::println!("");
+
+            /*
+            // has to write in 4's
+            let mut testdata = [0u32; 8];
+            for (j, d) in testdata.iter_mut().enumerate() {
+                *d = (j + k * 0x100) as u32;
+            }
+            unsafe {
+                reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &testdata);
+            }
+            cache_flush();
+            // enable all error detection - must be re-enabled after the write operation
+            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+            for (index, &data) in check_array.iter().enumerate() {
+                let offset = base + index * size_of::<u32>();
+                let expected = if case_writeable(offset) {
+                    testdata[index]
+                } else {
+                    // default data modulo access controls
+                    match case_region(offset) {
+                        // key region is currently blocked because HMAC is not setup
+                        AccessRegion::Key => 0,
+                        AccessRegion::Data => {
+                            if case_readable(offset) {
+                                data_default(offset)
+                            } else {
+                                0
+                            }
+                        }
+                        AccessRegion::Acram => acram_default(offset),
+                        _ => 0,
+                    }
+                };
+                if expected == data {
+                    passing += 1;
+                } else {
+                    crate::println!("wr mismatch: want {:08x}, got {:08x}", expected, data);
+                }
+            } */
+        }
     }
 
     // tuple of number passing, total cases
