@@ -9,6 +9,7 @@
 // MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE.
 // Please see the [CERN-OHL- W-2.0] for applicable conditions.
 
+use cipher::typenum::array;
 use utralib::generated::*;
 use xous_pl230::*;
 
@@ -24,7 +25,7 @@ const CORNERS_TOTAL: usize = CORNER_TESTS * CORNERS * size_of::<u32>();
 
 // lifecycle tests are not yet complete, because the code for handling lifecycles
 // is not yet defined.
-const CASES: [(&'static str, usize); 16] = [
+const CASES: [(&'static str, usize); 15] = [
     ("keyselu0", KEYSEL_START + 0 * 32),
     ("keyselu1", KEYSEL_START + 1 * 32),
     ("keyselu2", KEYSEL_START + 2 * 32),
@@ -39,7 +40,6 @@ const CASES: [(&'static str, usize); 16] = [
     ("dataselu0Rw", DATASEL_START + (0 + 1 * 4) * 32),
     ("dataselu0rW", DATASEL_START + (0 + 2 * 4) * 32),
     ("dataselu0RW", DATASEL_START + (0 + 3 * 4) * 32),
-    ("codesel", CODESEL_END - 0x1000),
     ("acram", ACRAM_START),
 ];
 const LIFECYCLE_TESTS: usize = CASES.len() * 8;
@@ -497,26 +497,42 @@ fn data_default(offset: usize) -> u32 {
     let sentinels = [0xfaceface, 0xf00df00d, 0xd00dd00d, 0x600d600d];
     // mask out lower two bits
     let offset = offset & 0xFFFF_FFFC;
-    if (offset & 0b100) != 0 { sentinels[(offset & 0b11_000) >> 3] } else { ((offset as u32) >> 5) & 0x00FF_FFFF }
+    if (offset & 0b100) != 0 {
+        sentinels[(offset & 0b11_000) >> 3]
+    } else {
+        ((offset as u32) >> 5) & 0x00FF_FFFF
+    }
 }
 
 fn key_default(offset: usize) -> u32 {
     let sentinels = [0xabcdef00, 0x1234678, 0x77778888, 0xccccdddd];
     // mask out lower two bits
     let offset = offset & 0xFFFF_FFFC;
-    if (offset & 0b100) != 0 { sentinels[(offset & 0b11_000) >> 3] } else { ((offset as u32) >> 5) & 0x00FF_FFFF }
+    if (offset & 0b100) != 0 {
+        sentinels[(offset & 0b11_000) >> 3]
+    } else {
+        ((offset as u32) >> 5) & 0x00FF_FFFF
+    }
 }
 fn acram_default(offset: usize) -> u32 {
+    let array_size = 2048 * 4;
+    let access_offset = if offset - ACRAM_START < (2048 * 4) {
+        // data base
+        DATASEL_START + (offset & (array_size - 1)) * 4
+    } else {
+        // key base
+        KEYSEL_START + (offset & (array_size - 1)) * 4
+    };
     let mut value = 0;
-    if case_readable(offset) {
+    if case_readable(access_offset) {
         value |= 1;
     }
-    if case_writeable(offset) {
+    if case_writeable(access_offset) {
         value |= 2;
     }
-    value |= case_user_id(offset) << 16;
-    if case_region(offset) == AccessRegion::Data {
-        if case_writeable(offset) {
+    value |= case_user_id(access_offset) << 16;
+    if case_region(access_offset) == AccessRegion::Data {
+        if case_writeable(access_offset) {
             value |= 1 << 24;
         }
     }
@@ -546,25 +562,17 @@ pub fn rram_lockzones() -> usize {
                 AccessRegion::Key => {
                     if hmac_ok {
                         if case_readable(offset) {
-                            if case_user_id(offset) == user_id {
-                                key_default(offset)
-                            } else {
-                                0
-                            }
-                        } else {
-                            0
-                        } 
-                    } else {
-                        0
-                    }                
-                },
-                AccessRegion::Data => {
-                    if case_readable(offset) {
-                        if case_user_id(offset) == user_id {
-                            data_default(offset)
+                            if case_user_id(offset) == user_id { key_default(offset) } else { 0 }
                         } else {
                             0
                         }
+                    } else {
+                        0
+                    }
+                }
+                AccessRegion::Data => {
+                    if case_readable(offset) {
+                        if case_user_id(offset) == user_id { data_default(offset) } else { 0 }
                     } else {
                         0
                     }
