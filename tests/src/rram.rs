@@ -9,7 +9,6 @@
 // MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE.
 // Please see the [CERN-OHL- W-2.0] for applicable conditions.
 
-use cipher::typenum::array;
 use utralib::generated::*;
 use xous_pl230::*;
 
@@ -485,10 +484,11 @@ fn case_user_id(offset: usize) -> u32 {
     (1 << (offset & 0b11)) as u32
 }
 fn case_region(offset: usize) -> AccessRegion {
+    const ASSUMED_ACRAM_MATCH: usize = ACRAM_START & 0xFFFF_0000;
     match offset & 0xFFFF_0000 {
         KEYSEL_START => AccessRegion::Key,
         DATASEL_START => AccessRegion::Data,
-        ACRAM_START => AccessRegion::Acram,
+        ASSUMED_ACRAM_MATCH => AccessRegion::Acram,
         _ => AccessRegion::Invalid,
     }
 }
@@ -518,21 +518,21 @@ fn acram_default(offset: usize) -> u32 {
     let array_size = 2048 * 4;
     let access_offset = if offset - ACRAM_START < (2048 * 4) {
         // data base
-        DATASEL_START + (offset & (array_size - 1)) * 4
+        DATASEL_START + (offset & (array_size - 1)) * 8
     } else {
         // key base
-        KEYSEL_START + (offset & (array_size - 1)) * 4
+        KEYSEL_START + (offset & (array_size - 1)) * 8
     };
     let mut value = 0;
-    if case_readable(access_offset) {
+    if !case_readable(access_offset) {
         value |= 1;
     }
-    if case_writeable(access_offset) {
+    if !case_writeable(access_offset) {
         value |= 2;
     }
-    value |= case_user_id(access_offset) << 16;
+    value |= case_user_id(access_offset) << 20;
     if case_region(access_offset) == AccessRegion::Data {
-        if case_writeable(access_offset) {
+        if case_wrena(access_offset) {
             value |= 1 << 24;
         }
     }
@@ -548,7 +548,7 @@ pub fn rram_lockzones() -> usize {
     let user_id = coreuser.rf(utra::coreuser::STATUS_COREUSER) >> 4;
     let hmac_ok = false;
     let mut check_array = [0u32; 8];
-    for (k, &(case, base)) in CASES.iter().enumerate() {
+    for (_k, &(case, base)) in CASES.iter().enumerate() {
         // enable all error detection
         reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
 
@@ -560,7 +560,8 @@ pub fn rram_lockzones() -> usize {
             let offset = base + index * size_of::<u32>();
             let expected = match case_region(offset) {
                 AccessRegion::Key => {
-                    if hmac_ok {
+                    // first two slots are always readable
+                    if hmac_ok || ((offset & 0xFFFF) < 0x40) {
                         if case_readable(offset) {
                             if case_user_id(offset) == user_id { key_default(offset) } else { 0 }
                         } else {
