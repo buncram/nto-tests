@@ -505,7 +505,7 @@ fn data_default(offset: usize) -> u32 {
 }
 
 fn key_default(offset: usize) -> u32 {
-    let sentinels = [0xabcdef00, 0x1234678, 0x77778888, 0xccccdddd];
+    let sentinels = [0xabcdef00, 0x12345678, 0x77778888, 0xccccdddd];
     // mask out lower two bits
     let offset = offset & 0xFFFF_FFFC;
     if (offset & 0b100) != 0 {
