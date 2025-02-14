@@ -71,7 +71,7 @@ cam-tests = []
 lifecycle-tests = []
 pl230-tests = []
 
-default = ["fast-fclk", "coreuser-onehot"]
+default = ["fast-fclk", "coreuser-onehot", "aes-zkn", "bio-mul"]
 
 [target.'cfg(not(any(windows, unix)))'.dependencies]
 utralib = { path = "../utralib" }

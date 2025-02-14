@@ -24,7 +24,25 @@ const CORNERS_TOTAL: usize = CORNER_TESTS * CORNERS * size_of::<u32>();
 
 // lifecycle tests are not yet complete, because the code for handling lifecycles
 // is not yet defined.
-const LIFECYCLE_TESTS: usize = 1;
+const CASES: [(&'static str, usize); _] = [
+    ("keyselu0", KEYSEL_START + 0 * 32),
+    ("keyselu1", KEYSEL_START + 1 * 32),
+    ("keyselu2", KEYSEL_START + 2 * 32),
+    ("keyselu3", KEYSEL_START + 3 * 32),
+    ("keyselu0Rw", KEYSEL_START + (0 + 1 * 4) * 32),
+    ("keyselu0rW", KEYSEL_START + (0 + 2 * 4) * 32),
+    ("keyselu0RW", KEYSEL_START + (0 + 3 * 4) * 32),
+    ("dataselu0", DATASEL_START + 0 * 32),
+    ("dataselu1", DATASEL_START + 1 * 32),
+    ("dataselu2", DATASEL_START + 2 * 32),
+    ("dataselu3", DATASEL_START + 3 * 32),
+    ("dataselu0Rw", DATASEL_START + (0 + 1 * 4) * 32),
+    ("dataselu0rW", DATASEL_START + (0 + 2 * 4) * 32),
+    ("dataselu0RW", DATASEL_START + (0 + 3 * 4) * 32),
+    ("codesel", CODESEL_END - 0x1000),
+    ("acram", ACRAM_START),
+];
+const LIFECYCLE_TESTS: usize = CASES.len() * 8;
 
 const TOTAL_TESTS: usize = QUICK_TESTS + CORNERS_TOTAL;
 crate::impl_test!(RramTests, "RRAM", TOTAL_TESTS);
@@ -415,7 +433,7 @@ pub const CODESEL_END: usize = 0x603D_A000;
 
 crate::impl_test!(RramLifecycle, "RRAM Lifecycle", LIFECYCLE_TESTS);
 impl TestRunner for RramLifecycle {
-    fn run(&mut self) { self.passing_tests += rram_lockzones(); }
+    fn run(&mut self) { self.passing_tests += rram_lockzones().0; }
 }
 
 /*
@@ -442,53 +460,145 @@ impl TestRunner for RramLifecycle {
 
 */
 
+#[derive(PartialEq, Eq)]
+enum AccessRegion {
+    Key,
+    Data,
+    Acram,
+    Invalid,
+}
+
+fn case_readable(offset: usize) -> bool {
+    let offset = (offset & 0xFFFF) / 32;
+    (offset & 0b100) == 0
+}
+fn case_writeable(offset: usize) -> bool {
+    let offset = (offset & 0xFFFF) / 32;
+    (offset & 0b1000) == 0
+}
+fn case_wrena(offset: usize) -> bool {
+    let offset = (offset & 0xFFFF) / 32;
+    (offset & 0b1_0000) != 0
+}
+fn case_user_id(offset: usize) -> u32 {
+    let offset = (offset & 0xFFFF) / 32;
+    (1 << (offset & 0b11)) as u32
+}
+fn case_region(offset: usize) -> AccessRegion {
+    match offset & 0xFFFF_0000 {
+        KEYSEL_START => AccessRegion::Key,
+        DATASEL_START => AccessRegion::Data,
+        ACRAM_START => AccessRegion::Acram,
+        _ => AccessRegion::Invalid,
+    }
+}
+
+fn data_default(offset: usize) -> u32 {
+    let sentinels = [0xfeedface, 0xf00df00d, 0xd00d00d, 0x600d600d];
+    // mask out lower two bits
+    let offset = offset & 0xFFFF_FFFC;
+    if (offset % 4 != 0) { sentinels[offset >> 4] } else { (offset >> 5) & 0x00FF_FFFF }
+}
+
+fn key_default(offset: usize) -> u32 {
+    let sentinels = [0xabcdef00, 0x1234678, 0x77778888, 0xccccdddd];
+    // mask out lower two bits
+    let offset = offset & 0xFFFF_FFFC;
+    if (offset % 4 != 0) { sentinels[offset >> 4] } else { (offset >> 5) & 0x00FF_FFFF }
+}
+fn acram_default(offset: usize) -> u32 {
+    let mut value = 0;
+    if case_readable(offset) {
+        value |= 1;
+    }
+    if case_writeable(offset) {
+        value |= 2;
+    }
+    value |= (case_user_id(offset) << 16);
+    if case_region(offset) == AccessRegion::Data {
+        if case_writeable(offset) {
+            value |= 1 << 24;
+        }
+    }
+    value
+}
+
 pub fn rram_lockzones() -> usize {
     let mut reram = Reram::new();
-    let cases = [
-        ("keyselu0", KEYSEL_START + 0 * 32),
-        ("keyselu1", KEYSEL_START + 1 * 32),
-        ("keyselu2", KEYSEL_START + 2 * 32),
-        ("keyselu3", KEYSEL_START + 3 * 32),
-        ("keyselu0Rw", KEYSEL_START + (0 + 1 * 4) * 32),
-        ("keyselu0rW", KEYSEL_START + (0 + 2 * 4) * 32),
-        ("keyselu0RW", KEYSEL_START + (0 + 3 * 4) * 32),
-        ("dataselu0", DATASEL_START + 0 * 32),
-        ("dataselu1", DATASEL_START + 1 * 32),
-        ("dataselu2", DATASEL_START + 2 * 32),
-        ("dataselu3", DATASEL_START + 3 * 32),
-        ("dataselu0Rw", DATASEL_START + (0 + 1 * 4) * 32),
-        ("dataselu0rW", DATASEL_START + (0 + 2 * 4) * 32),
-        ("dataselu0RW", DATASEL_START + (0 + 3 * 4) * 32),
-        ("codesel", CODESEL_END - 0x1000),
-        ("acram", ACRAM_START),
-    ];
-    for i in 1..2 {
-        for (k, &(case, base)) in cases.iter().enumerate() {
-            // enable all error detection
-            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
-            crate::print!("{} base: @{:x} -> ", case, base);
-            for j in 0..8 {
-                crate::print!("{:08x} ", unsafe { (base as *mut u32).add(j).read_volatile() });
+    let mut passing = 0;
+
+    let mut check_array = [0u32; 8];
+    for (k, &(case, base)) in CASES.iter().enumerate() {
+        // enable all error detection
+        reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+
+        // attempt to read data
+        let slice = unsafe { core::slice::from_raw_parts(base as *mut u32, 8) };
+        check_array.copy_from_slice(slice);
+        crate::print!("{} base: @{:x} -> ", case, base);
+        for (index, &data) in check_array.iter().enumerate() {
+            let offset = base + index * size_of::<u32>();
+            let expected = match case_region(offset) {
+                // key region is currently blocked because HMAC is not setup
+                AccessRegion::Key => 0,
+                AccessRegion::Data => {
+                    if case_readable(offset) {
+                        data_default(offset)
+                    } else {
+                        0
+                    }
+                }
+                AccessRegion::Acram => acram_default(offset),
+                _ => 0,
+            };
+            if expected == data {
+                crate::print!("{:08x}  ", data);
+                passing += 1;
+            } else {
+                crate::print!("{:08x}* ", data);
             }
-            crate::println!("");
-            // has to write in 4's
-            let mut testdata = [0u32; 8];
-            for (j, d) in testdata.iter_mut().enumerate() {
-                *d = (0x1000 * i + j + k * 0x100) as u32;
+        }
+        crate::println!("");
+
+        // has to write in 4's
+        let mut testdata = [0u32; 8];
+        for (j, d) in testdata.iter_mut().enumerate() {
+            *d = (0x1000 * i + j + k * 0x100) as u32;
+        }
+        unsafe {
+            reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &testdata);
+        }
+        cache_flush();
+        // enable all error detection - must be re-enabled after the write operation
+        reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+        for (index, &data) in check_array.iter().enumerate() {
+            let offset = base + index * size_of::<u32>();
+            let expected = if case_writeable(offset) {
+                testdata[index]
+            } else {
+                // default data modulo access controls
+                match case_region(offset) {
+                    // key region is currently blocked because HMAC is not setup
+                    AccessRegion::Key => 0,
+                    AccessRegion::Data => {
+                        if case_readable(offset) {
+                            data_default(offset)
+                        } else {
+                            0
+                        }
+                    }
+                    AccessRegion::Acram => acram_default(offset),
+                    _ => 0,
+                }
+            };
+            if expected == data {
+                passing += 1;
+            } else {
+                crate::println!("wr mismatch: want {:08x}, got {:08x}", expected, data);
             }
-            unsafe {
-                reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &testdata);
-            }
-            cache_flush();
-            // enable all error detection - must be re-enabled after the write operation
-            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
-            crate::print!("{}  rbk: @{:x} -> ", case, base);
-            for j in 0..8 {
-                crate::print!("{:08x} ", unsafe { (base as *mut u32).add(j).read_volatile() });
-            }
-            crate::println!("\n");
         }
     }
 
-    1
+    // tuple of number passing, total cases
+    passing
 }
