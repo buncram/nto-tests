@@ -79,7 +79,8 @@ const _READ_CASES: [(&'static str, usize); 15] = [
 const LIFECYCLE_TESTS: usize =
     // READ_CASES.len() * 8 * 4 // each case has 8 words; checked across each of 4 coreuser modes
     16 * 8 * 4 * 2  // key slots each checked against 4 core user modes for read and write
-    + 16 * 8 * 4 * 2; // data slots each checked against 4 core user modes for read and write
+    + 16 * 8 * 4 * 2 + // data slots each checked against 4 core user modes for read and write
+    4 * 4 * 2 + 1; // acram test cases: 4 modes * 4 combos of rw bits * (read + write test) + final check
 
 const TOTAL_TESTS: usize = QUICK_TESTS + CORNERS_TOTAL;
 crate::impl_test!(RramTests, "RRAM", TOTAL_TESTS);
