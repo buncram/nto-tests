@@ -852,7 +852,7 @@ fn acram_update_case(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) ->
             if writeable && (onehot_coreuser == init_coreuser) {
                 array_data.copy_from_slice(&new_data);
                 final_check_data.copy_from_slice(&new_data);
-                crate::println!("copied final check {:x?}", final_check_data);
+                // crate::println!("copied final check {:x?}", final_check_data);
             }
             if readable {
                 check_data.copy_from_slice(&secure_slice);
