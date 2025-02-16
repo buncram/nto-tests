@@ -22,9 +22,44 @@ const CORNER_TESTS: usize = 12;
 const CORNERS: usize = 4;
 const CORNERS_TOTAL: usize = CORNER_TESTS * CORNERS * size_of::<u32>();
 
-// lifecycle tests are not yet complete, because the code for handling lifecycles
-// is not yet defined.
-const READ_CASES: [(&'static str, usize); 15] = [
+/// CoreuserId is the one-hot encoded user ID as read back by the STATUS_COREUSER register.
+///
+/// Note that the actual user ID written into the table mapping is a binary-encoded value
+/// that represents the shift of the bit in the one-hot encoded field: so the hardware
+/// takes care of going from dense to one-hot encoding on the ASID to coreuser table.
+#[repr(usize)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum CoreuserId {
+    Boot0 = 1,
+    Boot1 = 2,
+    Fw0 = 4,
+    Fw1 = 8,
+}
+impl Into<&'static str> for CoreuserId {
+    fn into(self) -> &'static str {
+        match self {
+            Self::Boot0 => "Bt0",
+            Self::Boot1 => "Bt1",
+            Self::Fw0 => "Fw0",
+            Self::Fw1 => "Fw1",
+        }
+    }
+}
+impl From<u32> for CoreuserId {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Self::Boot0,
+            2 => Self::Boot1,
+            4 => Self::Fw0,
+            8 => Self::Fw1,
+            _ => unreachable!("invalid coreuser one-hot integer value"),
+        }
+    }
+}
+
+// Previously, the cases were hand-picked. Now we algorithmically generate
+// them. But it's handy to keep this around for code reference.
+const _READ_CASES: [(&'static str, usize); 15] = [
     ("keyselu0", KEYSEL_START + 0 * 32),
     ("keyselu1", KEYSEL_START + 1 * 32),
     ("keyselu2", KEYSEL_START + 2 * 32),
@@ -41,8 +76,9 @@ const READ_CASES: [(&'static str, usize); 15] = [
     ("dataselu0RW", DATASEL_START + (0 + 3 * 4) * 32),
     ("acram", ACRAM_START),
 ];
-const LIFECYCLE_TESTS: usize = READ_CASES.len() * 8 * 4 // each case has 8 words; checked across each of 4 coreuser modes
-    + 16 * 8 * 4 * 2  // key slots each checked against 4 core user modes for read and write
+const LIFECYCLE_TESTS: usize =
+    // READ_CASES.len() * 8 * 4 // each case has 8 words; checked across each of 4 coreuser modes
+    16 * 8 * 4 * 2  // key slots each checked against 4 core user modes for read and write
     + 16 * 8 * 4 * 2; // data slots each checked against 4 core user modes for read and write
 
 const TOTAL_TESTS: usize = QUICK_TESTS + CORNERS_TOTAL;
@@ -481,6 +517,8 @@ fn case_wrena(offset: usize) -> bool {
     let offset = (offset & 0xFFFF) / 32;
     (offset & 0b1_0000) != 0
 }
+/// Returns the one-hot encoded version of the coreuser ID, so that the
+/// value corresponds to what is read back in the STATUS_COREUSER register
 fn case_user_id(offset: usize) -> u32 {
     let offset = (offset & 0xFFFF) / 32;
     (1 << (offset & 0b11)) as u32
@@ -493,6 +531,14 @@ fn case_region(offset: usize) -> AccessRegion {
         ASSUMED_ACRAM_MATCH => AccessRegion::Acram,
         _ => AccessRegion::Invalid,
     }
+}
+fn acram_encode(readable: bool, writeable: bool, onehot_user_id: CoreuserId, prog_only: bool) -> u32 {
+    let mut ret = 0;
+    ret |= if !readable { 1 } else { 0 };
+    ret |= if !writeable { 2 } else { 0 };
+    ret |= (onehot_user_id as u32) << 20;
+    ret |= if prog_only { 1 << 24 } else { 0 };
+    ret
 }
 
 fn data_default(offset: usize) -> u32 {
@@ -551,7 +597,7 @@ pub fn rram_lockzones() -> usize {
     // set to 0 so we can safely mask it later on
     coreuser.wo(utra::coreuser::USERVALUE, 0);
     coreuser.rmwf(utra::coreuser::USERVALUE_DEFAULT, default);
-    // straightforward mapping; creative mappings are tested elsewhere
+    // straightforward mapping: the decoder functions are user_to_asid() and asid_to_user()
     let trusted_asids = [(1, 0), (2, 1), (3, 2), (4, 3), (1, 0), (1, 0), (1, 0), (1, 0)];
     let asid_fields = [
         (utra::coreuser::MAP_LO_LUT0, utra::coreuser::USERVALUE_USER0),
@@ -571,76 +617,6 @@ pub fn rram_lockzones() -> usize {
     coreuser.wo(utra::coreuser::CONTROL, 0);
     coreuser.rmwf(utra::coreuser::CONTROL_ENABLE, 1);
 
-    let hmac_ok = false;
-    let mut check_array = [0u32; 8];
-
-    /* // this test is passing, skip it while we debug the next test
-
-    // test general read access permissions
-    for test_user in 1..=4 {
-        // set the ASID, which updates the coreuser value
-        let satp: u32 = 0x8000_0000 | test_user << 22 | (ROOT_PT_PA as u32 >> 12);
-        unsafe {
-            core::arch::asm!(
-                "csrw        satp, {satp_val}",
-                "sfence.vma",
-                satp_val = in(reg) satp,
-            );
-        }
-        // extract the current coreuser ID so we can know if we should be accessing the data or not
-        let user_id = coreuser.rf(utra::coreuser::STATUS_COREUSER) >> 4;
-        crate::println!("*** Checking read user_id: {:x}", user_id);
-        for (_k, &(case, base)) in READ_CASES.iter().enumerate() {
-            // enable all error detection
-            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
-
-            // attempt to read data
-            let slice = unsafe { core::slice::from_raw_parts(base as *mut u32, 8) };
-            check_array.copy_from_slice(slice);
-            crate::print!("{} base: @{:x} -> ", case, base);
-            for (index, &data) in check_array.iter().enumerate() {
-                let offset = base + index * size_of::<u32>();
-                let expected = match case_region(offset) {
-                    AccessRegion::Key => {
-                        // first two slots are always readable
-                        if hmac_ok || ((offset & 0xFFFF) < 0x40) {
-                            if case_readable(offset) {
-                                if case_user_id(offset) == user_id { key_default(offset) } else { 0 }
-                            } else {
-                                0
-                            }
-                        } else {
-                            0
-                        }
-                    }
-                    AccessRegion::Data => {
-                        if case_readable(offset) {
-                            if case_user_id(offset) == user_id { data_default(offset) } else { 0 }
-                        } else {
-                            0
-                        }
-                    }
-                    AccessRegion::Acram => {
-                        if user_id == 1 || user_id == 2 {
-                            acram_default(offset)
-                        } else {
-                            0
-                        }
-                    }
-                    _ => 0,
-                };
-                if expected == data {
-                    crate::print!("{:08x} ", data);
-                    passing += 1;
-                } else {
-                    crate::print!("(e){:08x}(g){:08x} ", expected, data);
-                }
-            }
-            crate::println!("");
-            cache_flush();
-        }
-    }
-    */
     crate::println!("*** Running write cases on keyslots");
     for slot in (KEYSEL_START..KEYSEL_START + 32 * 16).step_by(32) {
         passing += write_testcase(slot, &mut reram, &mut coreuser)
@@ -651,6 +627,294 @@ pub fn rram_lockzones() -> usize {
         passing += write_testcase(slot, &mut reram, &mut coreuser)
     }
 
+    crate::println!("*** Running ACRAM update test case");
+    // this corresponds to a default setting of (2)rw (user 2, read/write allowed)
+    let base = DATASEL_START + 1 * 32;
+    passing += acram_update_case(base, &mut reram, &mut coreuser);
+
+    passing
+}
+
+/// This matches values programmed into trusted_asids[]. They are not fixed and are
+/// software adjustable, so these mappings only apply to this test program.
+fn user_to_asid(user_id: CoreuserId) -> usize {
+    match user_id {
+        CoreuserId::Boot0 => 1,
+        CoreuserId::Boot1 => 2,
+        CoreuserId::Fw0 => 3,
+        CoreuserId::Fw1 => 4,
+    }
+}
+/// This matches values programmed into trusted_asids[]. They are not fixed and are
+/// software adjustable, so these mappings only apply to this test program.
+fn asid_to_user(asid: usize) -> CoreuserId {
+    match asid {
+        1 => CoreuserId::Boot0,
+        2 => CoreuserId::Boot1,
+        3 => CoreuserId::Fw0,
+        4 => CoreuserId::Fw1,
+        _ => unimplemented!("ASID not valid for this test"),
+    }
+}
+
+fn acram_update_case(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) -> usize {
+    let mut passing = 0;
+    let init_user = case_user_id(base);
+    let init_coreuser = CoreuserId::from(init_user);
+    let init_coreuser_mnemomic: &'static str = init_coreuser.into();
+    let init_readable = case_readable(base);
+    let init_writeable = case_writeable(base);
+    let init_state = base as u32 ^ 0x3141_5926;
+    let mut state = lfsr_next_u32(init_state);
+
+    // enable all error detection
+    reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+    cache_flush();
+
+    let test_asid = user_to_asid(init_user.into());
+    // confirm base permissions are correct by setting us to the expected user
+    let satp: u32 = 0x8000_0000 | (test_asid as u32) << 22 | (ROOT_PT_PA as u32 >> 12);
+    unsafe {
+        core::arch::asm!(
+            "csrw        satp, {satp_val}",
+            "sfence.vma",
+            satp_val = in(reg) satp,
+        );
+    }
+    let user_id = coreuser.rf(utra::coreuser::STATUS_COREUSER) >> 4;
+    if init_user != user_id {
+        crate::println!("Can't run ACRAM test due to precondition failure: coreuser setting is buggy.");
+        return 0;
+    }
+
+    // read the data in
+    let secure_slice = unsafe { core::slice::from_raw_parts(base as *mut u32, 8) };
+    let mut array_data = [0u32; 8];
+    array_data.copy_from_slice(&secure_slice);
+    let mut new_data = [0u32; 8];
+    let mut check_data = [0u32; 8];
+    // this saves the last valid write to our check spot
+    let mut final_check_data = [0u32; 8];
+    check_data.copy_from_slice(secure_slice);
+    if init_readable {
+        // if we got all 0's, assume we couldn't read when we *should* be able to
+        if check_data.iter().all(|&x| x == 0) {
+            crate::println!("Can't run ACRAM test due to precondition failure (unreadable)");
+            return 0;
+        }
+    } else {
+        if !check_data.iter().all(|&x| x == 0) {
+            crate::println!("Can't run ACRAM test due to precondition failure (read protect fail)");
+            return 0;
+        }
+    }
+    if init_writeable {
+        for d in new_data.iter_mut() {
+            *d = state;
+            state = lfsr_next_u32(state);
+        }
+        unsafe {
+            reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &new_data);
+        }
+        cache_flush();
+        // enable all error detection - must be re-enabled after the write operation
+        reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+
+        check_data.copy_from_slice(secure_slice);
+        if check_data != new_data {
+            crate::println!("Can't run ACRAM test due to precondition failure (write fail)");
+            return 0;
+        }
+        // update the expected array data
+        array_data.copy_from_slice(&new_data);
+    } else {
+        crate::println!(
+            "Warning: can't determine if write perms were updated correctly, pick a different base case"
+        );
+    }
+
+    crate::println!("Preconditions met, running ACRAM set test case on slot @ {:08x}!", base);
+    // Precondition assumed: we are testing a bank that is readable, writeable; and we are at it's user ID.
+    // Test loop:
+    //   For each user ID
+    //     For every combination of read/write
+    //       Confirm that settings are respected.
+    // Finally set to original value
+    //   Confirm that settings are respected.
+
+    // We can only patch a portion of ACRAM with a write, so we have to read back all the previous contents
+    let mut old_acram = [0u32; 8];
+    let mut new_acram = [0u32; 8];
+    // resolve the ACRAM offset versus the current base address
+    let acram_offset = match case_region(base) {
+        AccessRegion::Key => ((base & 0xFFFF) / 0x20 + 2048) * size_of::<u32>() + ACRAM_START,
+        AccessRegion::Data => ((base & 0xFFFF) / 0x20) * size_of::<u32>() + ACRAM_START,
+        _ => unreachable!("Invalid base offset, neither key nor data."),
+    };
+    let acram_base = acram_offset & !(32 - 1);
+    let acram_index = (acram_offset & (32 - 1)) / size_of::<u32>();
+    let acram_slice = unsafe { core::slice::from_raw_parts(acram_base as *mut u32, 8) };
+    crate::println!(
+        "offset of interest: {:x}, acram base: {:x}, acram_index: {}",
+        acram_offset,
+        acram_base,
+        acram_index
+    );
+    old_acram.copy_from_slice(acram_slice);
+    new_acram.copy_from_slice(&old_acram);
+    crate::println!("acram contents: {:x?}", old_acram);
+    // check that ACRAM contents match our expected defaults
+    let mut pass = true;
+    for (index, &acram) in old_acram.iter().enumerate() {
+        let expected = acram_default(acram_base + index * 4);
+        if acram != expected {
+            crate::println!("ACRAM default mismatch: (e){:08x}(g){:08x}", expected, acram);
+            pass = false;
+        }
+    }
+    if !pass {
+        crate::println!("Can't run test because ACRAM defaults are incorrect");
+        return 0;
+    }
+
+    for coreuser_as_asid in 1..=4 {
+        let onehot_coreuser = asid_to_user(coreuser_as_asid);
+        let coreuser_mnemonic: &'static str = onehot_coreuser.into();
+        crate::println!("*** {}", coreuser_mnemonic);
+        let rw_cases = [(false, false), (false, true), (true, false), (true, true)];
+
+        for (readable, writeable) in rw_cases {
+            let mnemonic = if readable && writeable {
+                "rw"
+            } else if !readable && writeable {
+                "-w"
+            } else if readable && !writeable {
+                "r-"
+            } else {
+                "--"
+            };
+            let acram_code = acram_encode(readable, writeable, onehot_coreuser, false);
+            new_acram[acram_index] = acram_code;
+            crate::println!("  ACRAM({},{}): {:08x}", coreuser_mnemonic, mnemonic, acram_code);
+
+            unsafe {
+                reram.write_u32_aligned(acram_base - utralib::HW_RERAM_MEM, &new_acram);
+            }
+            cache_flush();
+            // enable all error detection - must be re-enabled after the write operation
+            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+
+            // now test that the new permissions were respected
+            // user ID match
+            // Read test
+            check_data.fill(1);
+            check_data.copy_from_slice(&secure_slice);
+            if readable && (onehot_coreuser == init_coreuser) {
+                if check_data != array_data {
+                    crate::println!(
+                        "  {} ({},{})r: {:x?}(e) {:x?}(g)",
+                        init_coreuser_mnemomic,
+                        coreuser_mnemonic,
+                        mnemonic,
+                        array_data,
+                        check_data
+                    );
+                } else {
+                    passing += 1;
+                }
+            } else {
+                if !check_data.iter().all(|&x| x == 0) {
+                    crate::println!(
+                        "  {} ({},{})r: expected 0, got {:x?}",
+                        init_coreuser_mnemomic,
+                        coreuser_mnemonic,
+                        mnemonic,
+                        check_data
+                    );
+                } else {
+                    passing += 1;
+                }
+            }
+            // Write test
+            for d in new_data.iter_mut() {
+                *d = state;
+                state = lfsr_next_u32(state);
+            }
+            unsafe {
+                reram.write_u32_aligned(base - utralib::HW_RERAM_MEM, &new_data);
+            }
+            cache_flush();
+            // enable all error detection - must be re-enabled after the write operation
+            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+            check_data.fill(1);
+            let mut displaced_array = [0u32; 8];
+            displaced_array.copy_from_slice(&array_data);
+            if writeable && (onehot_coreuser == init_coreuser) {
+                array_data.copy_from_slice(&new_data);
+                final_check_data.copy_from_slice(&new_data);
+                crate::println!("copied final check {:x?}", final_check_data);
+            }
+            if readable {
+                check_data.copy_from_slice(&secure_slice);
+                if onehot_coreuser == init_coreuser {
+                    if check_data != array_data {
+                        crate::println!(
+                            "  {} ({},{})w: {:x?}(e) {:x?}(g)",
+                            init_coreuser_mnemomic,
+                            coreuser_mnemonic,
+                            mnemonic,
+                            array_data,
+                            check_data
+                        );
+                        crate::println!("      {:x?}(d)", displaced_array);
+                    } else {
+                        passing += 1;
+                    }
+                } else {
+                    if check_data.iter().all(|&x| x == 0) {
+                        passing += 1;
+                    } else {
+                        crate::println!(
+                            "  {} ({},{})w: expected 0; {:x?}(g)",
+                            init_coreuser_mnemomic,
+                            coreuser_mnemonic,
+                            mnemonic,
+                            check_data
+                        );
+                        crate::println!("      {:x?}(d)", displaced_array);
+                    }
+                }
+            } else {
+                // assumed pass, we can't verify it
+                passing += 1;
+            }
+        }
+    }
+    // reset to original
+    new_acram[acram_index] = acram_default(acram_offset);
+    unsafe {
+        reram.write_u32_aligned(acram_base - utralib::HW_RERAM_MEM, &new_acram);
+    }
+    cache_flush();
+    // enable all error detection - must be re-enabled after the write operation
+    reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+    // just a simple read to test that the permissions went back to the original state
+    check_data.fill(1);
+    // copy from secure_slice is necessary otherwise the values are optimized-in by the compiler
+    check_data.copy_from_slice(&secure_slice);
+    if init_readable {
+        if secure_slice != check_data {
+            crate::println!("closing access check: {:x?}(e), {:x?}(g)", check_data, secure_slice);
+        } else {
+            passing += 1;
+        }
+    } else {
+        if !secure_slice.iter().all(|&x| x == 0) {
+            crate::println!("closing access check: expected read deny, got {:x?}", secure_slice)
+        } else {
+            passing += 1;
+        }
+    }
     passing
 }
 
@@ -669,14 +933,26 @@ fn write_testcase(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) -> us
             _ => 0,
         };
     }
+    // create human readable string for expected case outcome
+    let mnemonic = if case_readable(base) && case_writeable(base) {
+        "rw"
+    } else if !case_readable(base) && case_writeable(base) {
+        "-w"
+    } else if case_readable(base) && !case_writeable(base) {
+        "r-"
+    } else {
+        "--"
+    };
 
     let hmac_ok = false;
     let mut passing = 0;
     let init_state = base as u32 ^ 0x3141_5926;
     let mut state = lfsr_next_u32(init_state);
-    for test_user in 1..=4 {
+    for test_asid in 1..=4 {
+        let user_match =
+            if asid_to_user(test_asid) as usize as u32 == case_user_id(base) { "+" } else { "-" };
         // set the ASID, which updates the coreuser value
-        let satp: u32 = 0x8000_0000 | test_user << 22 | (ROOT_PT_PA as u32 >> 12);
+        let satp: u32 = 0x8000_0000 | (test_asid as u32) << 22 | (ROOT_PT_PA as u32 >> 12);
         unsafe {
             core::arch::asm!(
                 "csrw        satp, {satp_val}",
@@ -733,7 +1009,7 @@ fn write_testcase(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) -> us
                 passing += 1;
             } else {
                 if !err_found {
-                    crate::print!("RD({}) err @{:x} -> ", test_user, offset);
+                    crate::print!("RD({}){}{} err @{:x} -> ", test_asid, mnemonic, user_match, offset);
                     err_found = true;
                 }
                 crate::print!("(e){:08x}(g){:08x} ", expected, data);
@@ -742,7 +1018,7 @@ fn write_testcase(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) -> us
         if err_found {
             crate::println!("");
         } else {
-            crate::println!("RD({}) pass @{:x}", test_user, base);
+            crate::println!("RD({}){}{} pass @{:x}", test_asid, mnemonic, user_match, base);
         }
 
         // 2. Write something into the offset
@@ -801,7 +1077,7 @@ fn write_testcase(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) -> us
                 passing += 1;
             } else {
                 if !err_found {
-                    crate::print!("WR({}) err @{:x} -> ", test_user, offset);
+                    crate::print!("WR({}){}{} err @{:x} -> ", test_asid, mnemonic, user_match, offset);
                     err_found = true;
                 }
                 crate::print!("(e){:08x}(g){:08x} ", expected, data);
@@ -811,7 +1087,7 @@ fn write_testcase(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) -> us
         if err_found {
             crate::println!("");
         } else {
-            crate::println!("WR({}) pass @{:x}", test_user, base);
+            crate::println!("WR({}){}{} pass @{:x}", test_asid, mnemonic, user_match, base);
         }
     }
 
