@@ -57,6 +57,11 @@ impl From<u32> for CoreuserId {
     }
 }
 
+/// This is the code that enables the security modes. Must be written into
+/// RRCR on every update - kind of dangerous design, because it is too easy
+/// to overlook setting this in a compound register.
+const SECURITY_MODE: u32 = 0b1111_1100_0000_0000;
+
 // Previously, the cases were hand-picked. Now we algorithmically generate
 // them. But it's handy to keep this around for code reference.
 const _READ_CASES: [(&'static str, usize); 15] = [
@@ -288,7 +293,7 @@ pub struct Reram {
 impl Reram {
     pub fn new() -> Self {
         Reram {
-            csr: CSR::new(rrc::HW_RRC_BASE as *mut u32),
+            csr: CSR::new(utra::rrc::HW_RRC_BASE as *mut u32),
             pl230: xous_pl230::Pl230::new(),
             array: unsafe {
                 core::slice::from_raw_parts_mut(
@@ -320,7 +325,7 @@ impl Reram {
             }
             // crate::println!("");
 
-            self.csr.wo(rrc::RRC_CR, rrc::RRC_CR_WRITE_CMD);
+            self.csr.rmwf(utra::rrc::SFR_RRCCR_SFR_RRCCR, rrc::RRC_CR_WRITE_CMD | SECURITY_MODE);
             self.array
                 .as_mut_ptr()
                 .add(addr / core::mem::size_of::<u32>() + outer * 8)
@@ -331,7 +336,7 @@ impl Reram {
                 .add(addr / core::mem::size_of::<u32>() + outer * 8)
                 .write_volatile(rrc::RRC_WRITE_BUFFER);
             core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
-            self.csr.wo(rrc::RRC_CR, rrc::RRC_CR_NORMAL);
+            self.csr.rmwf(utra::rrc::SFR_RRCCR_SFR_RRCCR, rrc::RRC_CR_NORMAL | SECURITY_MODE);
         }
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
     }
@@ -669,8 +674,9 @@ fn acram_update_case(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) ->
     let mut state = lfsr_next_u32(init_state);
 
     // enable all error detection
-    reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+    reram.csr.wo(utra::rrc::SFR_RRCCR, SECURITY_MODE);
     cache_flush();
+    crate::println!("RRC CR check: 0x{:08x}", reram.csr.r(utra::rrc::SFR_RRCCR));
 
     let test_asid = user_to_asid(init_user.into());
     // confirm base permissions are correct by setting us to the expected user
@@ -719,7 +725,7 @@ fn acram_update_case(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) ->
         }
         cache_flush();
         // enable all error detection - must be re-enabled after the write operation
-        reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+        reram.csr.wo(utra::rrc::SFR_RRCCR, SECURITY_MODE);
 
         check_data.copy_from_slice(secure_slice);
         if check_data != new_data {
@@ -803,7 +809,7 @@ fn acram_update_case(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) ->
             }
             cache_flush();
             // enable all error detection - must be re-enabled after the write operation
-            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+            reram.csr.wo(utra::rrc::SFR_RRCCR, SECURITY_MODE);
 
             // now test that the new permissions were respected
             // user ID match
@@ -846,7 +852,7 @@ fn acram_update_case(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) ->
             }
             cache_flush();
             // enable all error detection - must be re-enabled after the write operation
-            reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+            reram.csr.wo(utra::rrc::SFR_RRCCR, SECURITY_MODE);
             check_data.fill(1);
             let mut displaced_array = [0u32; 8];
             displaced_array.copy_from_slice(&array_data);
@@ -898,7 +904,7 @@ fn acram_update_case(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) ->
     }
     cache_flush();
     // enable all error detection - must be re-enabled after the write operation
-    reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+    reram.csr.wo(utra::rrc::SFR_RRCCR, SECURITY_MODE);
     // just a simple read to test that the permissions went back to the original state
     check_data.fill(1);
     // copy from secure_slice is necessary otherwise the values are optimized-in by the compiler
@@ -965,7 +971,7 @@ fn write_testcase(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) -> us
         let user_id = coreuser.rf(utra::coreuser::STATUS_COREUSER) >> 4;
 
         // enable all error detection
-        reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+        reram.csr.wo(utra::rrc::SFR_RRCCR, SECURITY_MODE);
         cache_flush();
 
         // 1. confirm read value is correct
@@ -1028,7 +1034,7 @@ fn write_testcase(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) -> us
         for (index, d) in testdata.iter_mut().enumerate() {
             let offset = base + index * size_of::<u32>();
             *d = state;
-            if case_writeable(offset) {
+            if case_writeable(offset) && (asid_to_user(test_asid) as usize as u32 == case_user_id(base)) {
                 data_array[index] = state;
             }
             state = lfsr_next_u32(state);
@@ -1038,7 +1044,7 @@ fn write_testcase(base: usize, reram: &mut Reram, coreuser: &mut CSR<u32>) -> us
         }
         cache_flush();
         // enable all error detection - must be re-enabled after the write operation
-        reram.csr.wo(utra::rrc::SFR_RRCCR, 0b1111_1100_0000_0000);
+        reram.csr.wo(utra::rrc::SFR_RRCCR, SECURITY_MODE);
 
         // now check readback value after write
         let slice = unsafe { core::slice::from_raw_parts(base as *mut u32, 8) };
