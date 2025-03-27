@@ -37,7 +37,8 @@ hex-literal = "0.3.1"
 
 [features]
 std = []
-fast-fclk = []                      # 800 MHz FCLK
+fast-fclk = []                      # full speed FCLK
+slower = []                         # 600 MHz clock rate
 sram-margin = []
 debug-irq = []
 bio-mul = ["xous-bio-bdma/bio-mul"]

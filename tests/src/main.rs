@@ -121,9 +121,18 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
 
     #[cfg(not(feature = "quirks-pll"))]
     {
-        uart.tiny_write_str("setting clocks\r");
-        let perclk = init_clock_asic(800_000_000);
-        print!("perclk: {}\r", perclk);
+        #[cfg(feature = "slower")]
+        {
+            uart.tiny_write_str("setting clocks asic2 600\r");
+            let perclk = init_clock_asic2(600_000_000);
+            print!("perclk: {}\r", perclk);
+        }
+        #[cfg(not(feature = "slower"))]
+        {
+            uart.tiny_write_str("setting clocks asic 800\r");
+            let perclk = init_clock_asic(800_000_000);
+            print!("perclk: {}\r", perclk);
+        }
     }
     uart.tiny_write_str("booting... 001\r");
     reset_ticktimer();
