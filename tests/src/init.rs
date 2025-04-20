@@ -135,7 +135,7 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         daric_cgu.add(sysctrl::SFR_CGUSEL1.offset()).write_volatile(1); // 0: RC, 1: XTAL
         daric_cgu.add(sysctrl::SFR_CGUFSCR.offset()).write_volatile(48); // external crystal is 48MHz
         daric_cgu.add(sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
-    
+
         daric_cgu
             .add(sysctrl::SFR_IPCLPEN.offset())
             .write_volatile(daric_cgu.add(sysctrl::SFR_IPCLPEN.offset()).read_volatile() & !0x02);
@@ -200,12 +200,246 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
         daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_4.offset()).write_volatile(0x070f); // pclk
         // perclk divider - set to divide by 8 off of an 800Mhz base. Only found on NTO.
         daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x03_ff_ff);
+
+        // turn off gates
+        daric_cgu.add(utra::sysctrl::SFR_ACLKGR.offset()).write_volatile(0x2f);
+        daric_cgu.add(utra::sysctrl::SFR_HCLKGR.offset()).write_volatile(0xff);
+        daric_cgu.add(utra::sysctrl::SFR_ICLKGR.offset()).write_volatile(0x8f);
+        daric_cgu.add(utra::sysctrl::SFR_PCLKGR.offset()).write_volatile(0xff);
         // commit dividers
         daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
     }
     crate::println!("PLL configured to {} MHz", freq_hz / 1_000_000);
 
     vco_actual / perclk_div
+}
+
+pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
+    use utra::sysctrl;
+    let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
+    let mut cgu = CSR::new(daric_cgu);
+
+    const UNIT_MHZ: u32 = 1000 * 1000;
+    const PFD_F_MHZ: u32 = 16;
+    const FREQ_0: u32 = 16 * UNIT_MHZ;
+    const FREQ_OSC_MHZ: u32 = 48; // Actually 48MHz
+    const M: u32 = FREQ_OSC_MHZ / PFD_F_MHZ; //  - 1;  // OSC input was 24, replace with 48
+
+    const TBL_Q: [u16; 7] = [
+        // keep later DIV even number as possible
+        0x7777, // 16-32 MHz
+        0x7737, // 32-64
+        0x3733, // 64-128
+        0x3313, // 128-256
+        0x3311, // 256-512 // keep ~ 100MHz
+        0x3301, // 512-1024
+        0x3301, // 1024-1600
+    ];
+    const TBL_MUL: [u32; 7] = [
+        64, // 16-32 MHz
+        32, // 32-64
+        16, // 64-128
+        8,  // 128-256
+        4,  // 256-512
+        2,  // 512-1024
+        2,  // 1024-1600
+    ];
+
+    // Hits a 16:8:4:2:1 ratio on fclk:aclk:hclk:iclk:pclk
+    // Resulting in 800:400:200:100:50 MHz assuming 800MHz fclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_0.offset()).write_volatile(0x3f7f); // fclk
+
+    // Hits a 8:8:4:2:1 ratio on fclk:aclk:hclk:iclk:pclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_1.offset()).write_volatile(0x3f7f); // aclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_2.offset()).write_volatile(0x1f3f); // hclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_3.offset()).write_volatile(0x0f1f); // iclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_4.offset()).write_volatile(0x070f); // pclk
+    // perclk divider - set to divide by 16 off of an 800Mhz base. Only found on NTO.
+    // daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x03_ff_ff);
+    // perclk divider - set to divide by 8 off of an 800Mhz base. Only found on NTO.
+    daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x01_ff_ff);
+
+    /*
+        perclk fields:  min-cycle-lp | min-cycle | fd-lp | fd
+        clkper fd
+            0xff :   Fperclk = Fclktop/2
+            0x7f:   Fperclk = Fclktop/4
+            0x3f :   Fperclk = Fclktop/8
+            0x1f :   Fperclk = Fclktop/16
+            0x0f :   Fperclk = Fclktop/32
+            0x07 :   Fperclk = Fclktop/64
+            0x03:   Fperclk = Fclktop/128
+            0x01:   Fperclk = Fclktop/256
+
+        min cycle of clktop, F means frequency
+        Fperclk  Max = Fperclk/(min cycle+1)*2
+    */
+
+    // turn off gates
+    daric_cgu.add(utra::sysctrl::SFR_ACLKGR.offset()).write_volatile(0x2f);
+    daric_cgu.add(utra::sysctrl::SFR_HCLKGR.offset()).write_volatile(0xff);
+    daric_cgu.add(utra::sysctrl::SFR_ICLKGR.offset()).write_volatile(0x8f);
+    daric_cgu.add(utra::sysctrl::SFR_PCLKGR.offset()).write_volatile(0xff);
+    crate::println!("bef gates set");
+    // commit dividers
+    daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
+    crate::println!("gates set");
+    
+    if (0 == (cgu.r(sysctrl::SFR_IPCPLLMN) & 0x0001F000))
+        || (0 == (cgu.r(sysctrl::SFR_IPCPLLMN) & 0x00000fff))
+    {
+        // for SIM, avoid div by 0 if unconfigurated
+        // , default VCO 48MHz / 48 * 1200 = 1.2GHz
+        // TODO magic numbers
+        cgu.wo(sysctrl::SFR_IPCPLLMN, ((M << 12) & 0x0001F000) | ((1200) & 0x00000fff));
+        cgu.wo(sysctrl::SFR_IPCPLLF, 0);
+        cgu.wo(sysctrl::SFR_IPCARIPFLOW, 0x32);
+    }
+
+    // TODO select int/ext osc/xtal
+    // DARIC_CGU->cgusel1 = 1; // 0: RC, 1: XTAL
+    cgu.wo(sysctrl::SFR_CGUSEL1, 1);
+    // DARIC_CGU->cgufscr = FREQ_OSC_MHZ; // external crystal is 48MHz
+    cgu.wo(sysctrl::SFR_CGUFSCR, FREQ_OSC_MHZ);
+    // __DSB();
+    // DARIC_CGU->cguset = 0x32UL;
+    cgu.wo(sysctrl::SFR_CGUSET, 0x32);
+    // __DSB();
+
+    if freq_hz < 1000000 {
+        // DARIC_IPC->osc = freqHz;
+        cgu.wo(sysctrl::SFR_IPCOSC, freq_hz);
+        // __DSB();
+        // DARIC_IPC->ar     = 0x0032;  // commit, must write 32
+        cgu.wo(sysctrl::SFR_IPCARIPFLOW, 0x32);
+        // __DSB();
+    }
+    // switch to OSC
+    //DARIC_CGU->cgusel0 = 0; // clktop sel, 0:clksys, 1:clkpll0
+    cgu.wo(sysctrl::SFR_CGUSEL0, 0);
+    // __DSB();
+    // DARIC_CGU->cguset = 0x32; // commit
+    cgu.wo(sysctrl::SFR_CGUSET, 0x32);
+    //__DSB();
+
+    if freq_hz < 1000000 {
+    } else {
+        let mut n_fxp24: u64 = 0; // fixed point
+        let f16mhz_log2: u32 = (freq_hz / FREQ_0).ilog2();
+
+        // PD PLL
+        // DARIC_IPC->lpen |= 0x02 ;
+        cgu.wo(sysctrl::SFR_IPCLPEN, cgu.r(sysctrl::SFR_IPCLPEN) | 0x2);
+        // __DSB();
+        // DARIC_IPC->ar     = 0x0032;  // commit, must write 32
+        cgu.wo(sysctrl::SFR_IPCARIPFLOW, 0x32);
+        // __DSB();
+
+        // delay
+        // for (uint32_t i = 0; i < 1024; i++){
+        //    __NOP();
+        //}
+        for _ in 0..1024 {
+            unsafe { core::arch::asm!("nop") };
+        }
+        crate::println!("PLL delay 1");
+
+        n_fxp24 = (((freq_hz as u64) << 24) * TBL_MUL[f16mhz_log2 as usize] as u64
+            + PFD_F_MHZ as u64 * UNIT_MHZ as u64 / 2)
+            / (PFD_F_MHZ as u64 * UNIT_MHZ as u64); // rounded
+        let n_frac: u32 = (n_fxp24 & 0x00ffffff) as u32;
+
+        // TODO very verbose
+        //printf ("%s(%4" PRIu32 "MHz) M = %4" PRIu32 ", N = %4" PRIu32 ".%08" PRIu32 ", Q = %2lu, QDiv =
+        // 0x%04" PRIx16 "\n",     __FUNCTION__, freqHz / 1000000, M, (uint32_t)(n_fxp24 >> 24),
+        // (uint32_t)((uint64_t)(n_fxp24 & 0x00ffffff) * 100000000/(1UL <<24)), TBL_MUL[f16MHzLog2],
+        // TBL_Q[f16MHzLog2]); DARIC_IPC->pll_mn = ((M << 12) & 0x0001F000) | ((n_fxp24 >> 24) &
+        // 0x00000fff); // 0x1F598; // ??
+        cgu.wo(sysctrl::SFR_IPCPLLMN, ((M << 12) & 0x0001F000) | (((n_fxp24 >> 24) as u32) & 0x00000fff));
+        // DARIC_IPC->pll_f = n_frac | ((0 == n_frac) ? 0 : (1UL << 24)); // ??
+        cgu.wo(sysctrl::SFR_IPCPLLF, n_frac | if 0 == n_frac { 0 } else { 1u32 << 24 });
+        // DARIC_IPC->pll_q = TBL_Q[f16MHzLog2]; // ?? TODO select DIV for VCO freq
+        cgu.wo(sysctrl::SFR_IPCPLLQ, TBL_Q[f16mhz_log2 as usize] as u32);
+        //               VCO bias   CPP bias   CPI bias
+        //                1          2          3
+        //DARIC_IPC->ipc = (3 << 6) | (5 << 3) | (5);
+        // DARIC_IPC->ipc = (1 << 6) | (2 << 3) | (3);
+        cgu.wo(sysctrl::SFR_IPCCR, (1 << 6) | (2 << 3) | (3));
+        // __DSB();
+        // DARIC_IPC->ar     = 0x0032;  // commit
+        cgu.wo(sysctrl::SFR_IPCARIPFLOW, 0x32);
+        // __DSB();
+
+        // DARIC_IPC->lpen &= ~0x02;
+        cgu.wo(sysctrl::SFR_IPCLPEN, cgu.r(sysctrl::SFR_IPCLPEN) & !0x2);
+
+        //__DSB();
+        // DARIC_IPC->ar     = 0x0032;  // commit
+        cgu.wo(sysctrl::SFR_IPCARIPFLOW, 0x32);
+        // __DSB();
+
+        // delay
+        // for (uint32_t i = 0; i < 1024; i++){
+        //    __NOP();
+        // }
+        for _ in 0..1024 {
+            unsafe { core::arch::asm!("nop") };
+        }
+        crate::println!("PLL delay 2");
+
+        //printf("read reg a0 : %08" PRIx32"\n", *((volatile uint32_t* )0x400400a0));
+        //printf("read reg a4 : %04" PRIx16"\n", *((volatile uint16_t* )0x400400a4));
+        //printf("read reg a8 : %04" PRIx16"\n", *((volatile uint16_t* )0x400400a8));
+
+        // TODO wait/poll lock status?
+        // DARIC_CGU->cgusel0 = 1; // clktop sel, 0:clksys, 1:clkpll0
+        cgu.wo(sysctrl::SFR_CGUSEL0, 1);
+        // __DSB();
+        // DARIC_CGU->cguset = 0x32; // commit
+        cgu.wo(sysctrl::SFR_CGUSET, 0x32);
+        crate::println!("clocks set");
+
+        // __DSB();
+
+        // printf ("    MN: 0x%05x, F: 0x%06x, Q: 0x%04x\n",
+        //     DARIC_IPC->pll_mn, DARIC_IPC->pll_f, DARIC_IPC->pll_q);
+        // printf ("    LPEN: 0x%01x, OSC: 0x%04x, BIAS: 0x%04x,\n",
+        //     DARIC_IPC->lpen, DARIC_IPC->osc, DARIC_IPC->ipc);
+    }
+    crate::println!("mn {:x}, q{:x}", (0x400400a0 as *const u32).read_volatile(), (0x400400a8 as *const u32).read_volatile());
+
+    crate::println!("fsvalid: {}", daric_cgu.add(sysctrl::SFR_CGUFSVLD.offset()).read_volatile());
+    let _cgufsfreq0 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ0.offset()).read_volatile();
+    let _cgufsfreq1 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ1.offset()).read_volatile();
+    let _cgufsfreq2 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ2.offset()).read_volatile();
+    let _cgufsfreq3 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ3.offset()).read_volatile();
+    crate::println!(
+        "Internal osc: {} -> {} MHz ({} MHz)",
+        _cgufsfreq0,
+        fsfreq_to_hz(_cgufsfreq0),
+        fsfreq_to_hz_32(_cgufsfreq0)
+    );
+    crate::println!(
+        "XTAL: {} -> {} MHz ({} MHz)",
+        _cgufsfreq1,
+        fsfreq_to_hz(_cgufsfreq1),
+        fsfreq_to_hz_32(_cgufsfreq1)
+    );
+    crate::println!(
+        "pll output 0: {} -> {} MHz ({} MHz)",
+        _cgufsfreq2,
+        fsfreq_to_hz(_cgufsfreq2),
+        fsfreq_to_hz_32(_cgufsfreq2)
+    );
+    crate::println!(
+        "pll output 1: {} -> {} MHz ({} MHz)",
+        _cgufsfreq3,
+        fsfreq_to_hz(_cgufsfreq3),
+        fsfreq_to_hz_32(_cgufsfreq3)
+    );
+
+    crate::println!("PLL configured to {} MHz", freq_hz / 1_000_000);
+    100_000_000
 }
 
 #[allow(dead_code)]

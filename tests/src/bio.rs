@@ -18,6 +18,8 @@ const BIO_TESTS: usize =
     1
     // dma
     + 4 * 5 + 1
+    // clocking modes
+    // + 4 + 4 + 4 + 4 + 2
     // stack test
     + 1
     // hello word, hello multiverse, aclk_tests
@@ -66,8 +68,35 @@ impl TestRunner for BioTests {
         iox.set_gpio_pullup(cramium_hal::iox::IoxPort::PB, 2, cramium_hal::iox::IoxEnable::Enable);
         iox.set_gpio_pullup(cramium_hal::iox::IoxPort::PB, 3, cramium_hal::iox::IoxEnable::Enable);
 
-        self.passing_tests += bio_tests::units::hello_world();
+        // note: running hello_world up here breaks DMA. need to figure out why
 
+        self.passing_tests += bio_tests::units::hello_multiverse();
+
+        bio_tests::dma::dma_filter_off();
+        // crate::println!("*** CLKMODE 0 ***");
+        // self.passing_tests += bio_tests::dma::dma_basic(false, 0); // 4
+        // self.passing_tests += bio_tests::dma::dma_basic(true, 0); // 4
+        // self.passing_tests += bio_tests::dma::dma_bytes(); // 4
+        // self.passing_tests += bio_tests::dma::dma_u16(); // 4
+        // self.passing_tests += bio_tests::dma::dma_multicore(0); // 1
+        // self.passing_tests += bio_tests::dma::dma_coincident(0); // 4
+
+        // test clocking modes
+        // crate::println!("*** CLKMODE 1 ***");
+        // self.passing_tests += bio_tests::dma::dma_basic(false, 1); // 4
+        // self.passing_tests += bio_tests::dma::dma_coincident(1); // 4
+        // self.passing_tests += bio_tests::dma::dma_multicore(1); // 1
+
+        crate::println!("*** CLKMODE 3 ***");
+        self.passing_tests += bio_tests::dma::dma_basic(false, 3); // 4
+        self.passing_tests += bio_tests::dma::dma_basic(true, 3); // 4
+        self.passing_tests += bio_tests::dma::dma_bytes(); // 4
+        self.passing_tests += bio_tests::dma::dma_u16(); // 4
+        self.passing_tests += bio_tests::dma::dma_coincident(3); // 4
+        self.passing_tests += bio_tests::dma::dma_multicore(3); // 1
+        // return;
+
+        self.passing_tests += bio_tests::units::hello_world();
         self.passing_tests += bio_tests::arith::stack_test();
         #[cfg(feature = "bio-mul")]
         {
@@ -75,13 +104,6 @@ impl TestRunner for BioTests {
             self.passing_tests += unsafe { bio_tests::arith::mac_test() }; // 1
         }
 
-        bio_tests::dma::dma_filter_off();
-        self.passing_tests += bio_tests::dma::dma_basic(false); // 4
-        self.passing_tests += bio_tests::dma::dma_basic(true); // 4
-        self.passing_tests += bio_tests::dma::dma_bytes(); // 4
-        self.passing_tests += bio_tests::dma::dma_u16(); // 4
-        self.passing_tests += bio_tests::dma::dma_multicore(); // 1
-        self.passing_tests += bio_tests::dma::dma_coincident(); // 4
         self.passing_tests += bio_tests::units::aclk_tests();
 
         self.passing_tests += bio_tests::dma::filter_test();
@@ -91,7 +113,6 @@ impl TestRunner for BioTests {
         self.passing_tests += bio_tests::units::event_aliases();
         self.passing_tests += bio_tests::units::fifo_alias_tests();
 
-        self.passing_tests += bio_tests::units::hello_multiverse();
         self.passing_tests += bio_tests::units::fifo_basic();
         self.passing_tests += bio_tests::units::host_fifo_tests();
 

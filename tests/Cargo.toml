@@ -37,7 +37,8 @@ hex-literal = "0.3.1"
 
 [features]
 std = []
-fast-fclk = []                      # 800 MHz FCLK
+fast-fclk = []                      # full speed FCLK
+altclk = []                         # alternate clock setting
 sram-margin = []
 debug-irq = []
 bio-mul = ["xous-bio-bdma/bio-mul"]
@@ -45,6 +46,7 @@ coreuser-compression = []           # this feature is not used
 coreuser-lutop = []
 coreuser-onehot = []
 pio = []
+v0p9 = [] # 0.9V ram trimmings
 
 # legacy tests
 apb-test = []
@@ -71,7 +73,7 @@ cam-tests = []
 lifecycle-tests = []
 pl230-tests = []
 
-default = ["fast-fclk", "coreuser-onehot"]
+default = ["fast-fclk", "coreuser-onehot", "aes-zkn", "bio-mul"]
 
 [target.'cfg(not(any(windows, unix)))'.dependencies]
 utralib = { path = "../utralib" }

@@ -84,15 +84,21 @@ impl TestRunner for UdmaTests {
                 for chunk in dest[..32].chunks(4) {
                     crate::println!("{:x}", u32::from_le_bytes(chunk.try_into().unwrap()));
                 }
+                let mut passing = true;
                 for (i, chunk) in dest.chunks(4).enumerate() {
                     let checkval = u32::from_le_bytes(chunk.try_into().unwrap());
-                    assert!(
-                        checkval
-                            == 0xface_8000 + i as u32 + (test_iter as u32 + 1) * 16 / size_of::<u32>() as u32
-                    )
+                    let expected = 0xface_8000 + i as u32 + (test_iter as u32 + 1) * 16 / size_of::<u32>() as u32;
+                    if checkval != expected {
+                        crate::println!("fail {}, expected {:x} got {:x}", i, expected, checkval);
+                        passing = false;
+                    }
                 }
-                crate::println!("rom_read check passed!");
-                self.passing_tests += 1;
+                if passing {
+                    crate::println!("rom_read check passed!");
+                    self.passing_tests += 1;
+                } else {
+                    crate::println!("rom_read check FAILED!!!!");
+                }
             } else {
                 crate::println!("rom_read failed");
             }

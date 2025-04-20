@@ -183,6 +183,12 @@ void enable_fpu() {
 }
 
 void Reset_Handler(void) {
+    *((volatile uint32_t*)0x4001400C) = 0x8;
+
+    *((volatile uint32_t*)0x40014000) = 0x3; //sramcfg.cach:ema[2:0]=0x4 (default for 0.8V), 0x3 for 0.9V
+    *((volatile uint32_t*)0x40014014) = 0x1; //sramcfg.vexram:ema[2:0]=0x4 (default for 0.8V), 0x1 for 0.9V
+    // prevent data contamination due to TCM timing errors
+    while (1) {}
 #if 0
     if (*((uint32_t *) 0x61100000) != 0xCAFEFACE) {
         *((uint32_t *) 0x61100000) = 0xCAFEFACE;
@@ -230,6 +236,8 @@ void Reset_Handler(void) {
     for (int i = 0; i < 1000; i++) {
         print_string("Hello from CM7!\r");
     } */
+    *((unsigned int *) 0x40014004) = 5;
+    *((unsigned int *) 0x40014008) = 5;
     NVIC_SetPriority(MBOX_AVAIL_NVIC, 1);
     NVIC_EnableIRQ(MBOX_AVAIL_NVIC);
     NVIC_SetPriority(MBOX_ABORT_NVIC, 1);
@@ -669,6 +677,12 @@ void main_loop() {
 #else
     ticksDelay(10000);
     print_string("CM7 up\r\r");
+    print_string("cache config: ");
+    send_u32_hex(CCR);
+    SCB_EnableICache();
+    SCB_EnableDCache();
+    print_string("cache config: ");
+    send_u32_hex(CCR);
 #endif
     enable_fpu();
 
