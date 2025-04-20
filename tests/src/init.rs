@@ -214,6 +214,8 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
     vco_actual / perclk_div
 }
 
+// This function supercedes init_clock_asic() and needs to be back-ported
+// into xous-core
 pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
     use utra::sysctrl;
     let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
@@ -324,7 +326,7 @@ pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
 
     if freq_hz < 1000000 {
     } else {
-        let mut n_fxp24: u64 = 0; // fixed point
+        let n_fxp24: u64; // fixed point
         let f16mhz_log2: u32 = (freq_hz / FREQ_0).ilog2();
 
         // PD PLL
@@ -476,7 +478,9 @@ pub unsafe fn early_init() {
 // these register do not exist in our local simulation model
 pub fn setup_uart2() {
     const UART_IFRAM_ADDR: usize = utralib::HW_IFRAM0_MEM + utralib::HW_IFRAM0_MEM_LEN - 4096;
-    use cramium_hal::iox::{Iox, IoxDir, IoxEnable, IoxFunction, IoxPort};
+    use cramium_hal::iox::Iox;
+    use cramium_api::iox::{IoxDir, IoxEnable, IoxFunction, IoxPort};
+    use cramium_api::udma::*;
     use cramium_hal::udma;
     use cramium_hal::udma::Udma;
 
@@ -509,16 +513,16 @@ pub fn setup_uart2() {
 
     // Set up the UDMA_UART block to the correct baud rate and enable status
     let udma_global = udma::GlobalConfig::new(utra::udma_ctrl::HW_UDMA_CTRL_BASE as *mut u32);
-    udma_global.clock_on(udma::PeriphId::Uart1);
+    udma_global.clock_on(PeriphId::Uart1);
     udma_global.map_event(
-        udma::PeriphId::Uart1,
-        udma::PeriphEventType::Uart(udma::EventUartOffset::Rx),
-        udma::EventChannel::Channel0,
+        PeriphId::Uart1,
+        PeriphEventType::Uart(EventUartOffset::Rx),
+        EventChannel::Channel0,
     );
     udma_global.map_event(
-        udma::PeriphId::Uart1,
-        udma::PeriphEventType::Uart(udma::EventUartOffset::Tx),
-        udma::EventChannel::Channel1,
+        PeriphId::Uart1,
+        PeriphEventType::Uart(EventUartOffset::Tx),
+        EventChannel::Channel1,
     );
 
     let baudrate: u32 = 115200;

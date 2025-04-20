@@ -1,8 +1,7 @@
 use cramium_hal::ifram::IframRange;
-use cramium_hal::ifram::UdmaWidths;
-use cramium_hal::iox::IoSetup;
+use cramium_api::*;
 use cramium_hal::iox::*;
-use cramium_hal::ov2640::Format;
+use cramium_api::camera::Format;
 use cramium_hal::udma::Udma;
 use cramium_hal::udma::*;
 use utralib::CSR;

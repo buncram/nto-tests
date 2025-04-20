@@ -23,13 +23,14 @@ xous-pl230 = { path = "../../xous-core/libs/xous-pl230", default-features = fals
     "dma-mainram",
     "baremetal",
 ] }
-cramium-hal = { path = "../../xous-core/libs/cramium-hal", features = [
+cramium-hal = { path = "../../xous-core/libs/cramium-hal", default-features = false, features = [
     "udma-stress-test",
-    "board-baosec",
+    "test-baosec",
     "hdl-test",
 ] }
-pio-proc = "0.2.2"
-pio = "0.2.1"
+cramium-api = { path = "../../xous-core/libs/cramium-api" }
+pio-proc = { version = "0.2.2", optional = true }
+pio = { version = "0.2.1", optional = true }
 # Used by AES tests
 cipher = "0.4.2"
 zeroize = { version = "1.6.0", optional = true, default-features = false }
@@ -45,7 +46,7 @@ bio-mul = ["xous-bio-bdma/bio-mul"]
 coreuser-compression = []           # this feature is not used
 coreuser-lutop = []
 coreuser-onehot = []
-pio = []
+# pio = []
 v0p9 = [] # 0.9V ram trimmings
 
 # legacy tests
