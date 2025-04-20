@@ -245,6 +245,46 @@ pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
         2,  // 1024-1600
     ];
 
+    // Hits a 16:8:4:2:1 ratio on fclk:aclk:hclk:iclk:pclk
+    // Resulting in 800:400:200:100:50 MHz assuming 800MHz fclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_0.offset()).write_volatile(0x3f7f); // fclk
+
+    // Hits a 8:8:4:2:1 ratio on fclk:aclk:hclk:iclk:pclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_1.offset()).write_volatile(0x3f7f); // aclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_2.offset()).write_volatile(0x1f3f); // hclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_3.offset()).write_volatile(0x0f1f); // iclk
+    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_4.offset()).write_volatile(0x070f); // pclk
+    // perclk divider - set to divide by 16 off of an 800Mhz base. Only found on NTO.
+    // daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x03_ff_ff);
+    // perclk divider - set to divide by 8 off of an 800Mhz base. Only found on NTO.
+    daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x01_ff_ff);
+
+    /*
+        perclk fields:  min-cycle-lp | min-cycle | fd-lp | fd
+        clkper fd
+            0xff :   Fperclk = Fclktop/2
+            0x7f:   Fperclk = Fclktop/4
+            0x3f :   Fperclk = Fclktop/8
+            0x1f :   Fperclk = Fclktop/16
+            0x0f :   Fperclk = Fclktop/32
+            0x07 :   Fperclk = Fclktop/64
+            0x03:   Fperclk = Fclktop/128
+            0x01:   Fperclk = Fclktop/256
+
+        min cycle of clktop, F means frequency
+        Fperclk  Max = Fperclk/(min cycle+1)*2
+    */
+
+    // turn off gates
+    daric_cgu.add(utra::sysctrl::SFR_ACLKGR.offset()).write_volatile(0x2f);
+    daric_cgu.add(utra::sysctrl::SFR_HCLKGR.offset()).write_volatile(0xff);
+    daric_cgu.add(utra::sysctrl::SFR_ICLKGR.offset()).write_volatile(0x8f);
+    daric_cgu.add(utra::sysctrl::SFR_PCLKGR.offset()).write_volatile(0xff);
+    crate::println!("bef gates set");
+    // commit dividers
+    daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
+    crate::println!("gates set");
+    
     if (0 == (cgu.r(sysctrl::SFR_IPCPLLMN) & 0x0001F000))
         || (0 == (cgu.r(sysctrl::SFR_IPCPLLMN) & 0x00000fff))
     {
@@ -366,29 +406,7 @@ pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
         // printf ("    LPEN: 0x%01x, OSC: 0x%04x, BIAS: 0x%04x,\n",
         //     DARIC_IPC->lpen, DARIC_IPC->osc, DARIC_IPC->ipc);
     }
-
-    // Hits a 16:8:4:2:1 ratio on fclk:aclk:hclk:iclk:pclk
-    // Resulting in 800:400:200:100:50 MHz assuming 800MHz fclk
-    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_0.offset()).write_volatile(0x7fff); // fclk
-
-    // Hits a 8:8:4:2:1 ratio on fclk:aclk:hclk:iclk:pclk
-    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_1.offset()).write_volatile(0x3f7f); // aclk
-    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_2.offset()).write_volatile(0x1f3f); // hclk
-    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_3.offset()).write_volatile(0x0f1f); // iclk
-    daric_cgu.add(utra::sysctrl::SFR_CGUFD_CFGFDCR_0_4_4.offset()).write_volatile(0x070f); // pclk
-    // perclk divider - set to divide by 8 off of an 800Mhz base. Only found on NTO.
-    // daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x03_ff_ff);
-    daric_cgu.add(utra::sysctrl::SFR_CGUFDPER.offset()).write_volatile(0x01_ff);
-
-    // turn off gates
-    daric_cgu.add(utra::sysctrl::SFR_ACLKGR.offset()).write_volatile(0x2f);
-    daric_cgu.add(utra::sysctrl::SFR_HCLKGR.offset()).write_volatile(0xff);
-    daric_cgu.add(utra::sysctrl::SFR_ICLKGR.offset()).write_volatile(0x8f);
-    daric_cgu.add(utra::sysctrl::SFR_PCLKGR.offset()).write_volatile(0xff);
-    crate::println!("bef gates set");
-    // commit dividers
-    daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
-    crate::println!("gates set");
+    crate::println!("mn {:x}, q{:x}", (0x400400a0 as *const u32).read_volatile(), (0x400400a8 as *const u32).read_volatile());
 
     crate::println!("fsvalid: {}", daric_cgu.add(sysctrl::SFR_CGUFSVLD.offset()).read_volatile());
     let _cgufsfreq0 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ0.offset()).read_volatile();
