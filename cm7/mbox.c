@@ -183,6 +183,12 @@ void enable_fpu() {
 }
 
 void Reset_Handler(void) {
+    *((volatile uint32_t*)0x4001400C) = 0x8;
+
+    *((volatile uint32_t*)0x40014000) = 0x3; //sramcfg.cach:ema[2:0]=0x4 (default for 0.8V), 0x3 for 0.9V
+    *((volatile uint32_t*)0x40014014) = 0x1; //sramcfg.vexram:ema[2:0]=0x4 (default for 0.8V), 0x1 for 0.9V
+    // prevent data contamination due to TCM timing errors
+    while (1) {}
 #if 0
     if (*((uint32_t *) 0x61100000) != 0xCAFEFACE) {
         *((uint32_t *) 0x61100000) = 0xCAFEFACE;
