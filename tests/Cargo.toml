@@ -38,7 +38,7 @@ hex-literal = "0.3.1"
 [features]
 std = []
 fast-fclk = []                      # full speed FCLK
-slower = []                         # 600 MHz clock rate
+altclk = []                         # alternate clock setting
 sram-margin = []
 debug-irq = []
 bio-mul = ["xous-bio-bdma/bio-mul"]
@@ -46,6 +46,7 @@ coreuser-compression = []           # this feature is not used
 coreuser-lutop = []
 coreuser-onehot = []
 pio = []
+v0p9 = [] # 0.9V ram trimmings
 
 # legacy tests
 apb-test = []
