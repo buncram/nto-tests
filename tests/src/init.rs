@@ -214,6 +214,8 @@ pub unsafe fn init_clock_asic(freq_hz: u32) -> u32 {
     vco_actual / perclk_div
 }
 
+// This function supercedes init_clock_asic() and needs to be back-ported
+// into xous-core
 pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
     use utra::sysctrl;
     let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
