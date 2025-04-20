@@ -118,19 +118,97 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
                 | ((waitcycles << 3) & 0x18),
         );
     }
+    // sram0 requires 1 wait state for writes
+    let mut sramtrm = CSR::new(utra::coresub_sramtrm::HW_CORESUB_SRAMTRM_BASE as *mut u32);
+    sramtrm.wo(utra::coresub_sramtrm::SFR_SRAM0, 0x8);
+    sramtrm.wo(utra::coresub_sramtrm::SFR_SRAM1, 0x0);
+
+    #[cfg(feature = "v0p9")]
+    {
+        uart.tiny_write_str("t0\r");
+        let mut sramtrm = CSR::new(utra::coresub_sramtrm::HW_CORESUB_SRAMTRM_BASE as *mut u32);
+        sramtrm.wo(utra::coresub_sramtrm::SFR_CACHE, 0x3);
+        sramtrm.wo(utra::coresub_sramtrm::SFR_ITCM, 0x3);
+        sramtrm.wo(utra::coresub_sramtrm::SFR_DTCM, 0x3);
+        sramtrm.wo(utra::coresub_sramtrm::SFR_VEXRAM, 0x1);
+        uart.tiny_write_str("t1\r");
+        let mut rbist = CSR::new(utra::rbist_wrp::HW_RBIST_WRP_BASE as *mut u32);
+        // bio 0.9v settings
+        rbist.wo(utra::rbist_wrp::SFRCR_TRM, (19 << 16) | 0b011_000_01_0_0_000_0_00);
+        rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+
+        // vex 0.9v settings
+        for i in 0..4 {
+            rbist.wo(utra::rbist_wrp::SFRCR_TRM, ((15 + i) << 16) | 0b001_010_00_0_0_000_0_00);
+            rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+        }
+
+        // sram 0.9v settings
+        rbist.wo(utra::rbist_wrp::SFRCR_TRM, (0 << 16) | 0b011_000_01_0_1_000_0_00);
+        rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+        rbist.wo(utra::rbist_wrp::SFRCR_TRM, (1 << 16) | 0b011_000_00_0_0_000_0_00);
+        rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+
+        // tcm 0.9v
+        rbist.wo(utra::rbist_wrp::SFRCR_TRM, (6 << 16) | 0b011_000_00_0_0_000_0_00);
+        rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+        rbist.wo(utra::rbist_wrp::SFRCR_TRM, (7 << 16) | 0b011_000_00_0_0_000_0_00);
+        rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+
+        // ifram 0.9v
+        rbist.wo(utra::rbist_wrp::SFRCR_TRM, (8 << 16) | 0b010_000_00_0_1_000_1_01);
+        rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+
+        // sce 0.9V
+        rbist.wo(utra::rbist_wrp::SFRCR_TRM, (9 << 16) | 0b011_000_00_0_0_000_0_00);
+        rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+        for i in 0..4 {
+            rbist.wo(utra::rbist_wrp::SFRCR_TRM, ((10 + i) << 16) | 0b011_000_01_0_1_000_0_00);
+            rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+        }
+        rbist.wo(utra::rbist_wrp::SFRCR_TRM, (14 << 16) | 0b001_010_00_0_0_000_0_00);
+        rbist.wo(utra::rbist_wrp::SFRAR_TRM, 0x5a);
+    }
 
     #[cfg(not(feature = "quirks-pll"))]
     {
-        #[cfg(feature = "slower")]
+        #[cfg(feature = "altclk")]
         {
-            uart.tiny_write_str("setting clocks asic2 600\r");
-            let perclk = init_clock_asic2(600_000_000);
+            uart.tiny_write_str("setting clocks asic2 400\r");
+            let perclk = init_clock_asic2(400_000_000);
             print!("perclk: {}\r", perclk);
         }
-        #[cfg(not(feature = "slower"))]
-        {
-            uart.tiny_write_str("setting clocks asic 800\r");
-            let perclk = init_clock_asic(800_000_000);
+        #[cfg(all(not(feature = "altclk"), feature = "v0p9"))]
+        unsafe {
+            uart.tiny_write_str("set clk asic2 700 fclk350\r");
+            let perclk = init_clock_asic2(700_000_000);
+            print!("perclk: {}\r", perclk);
+            /*
+            uart.tiny_write_str("bypass to 500\r");
+            // Turn on PLL
+            (0x400400A0 as *mut u32).write_volatile(0x103E8); //clk0=500MHz, clk1=200MHz
+            (0x400400A4 as *mut u32).write_volatile(0x1000000);
+            (0x400400A8 as *mut u32).write_volatile(0x2412);
+            (0x40040090 as *mut u32).write_volatile(0x32);
+            // Switch to PLL
+            (0x40040010 as *mut u32).write_volatile(0x1); //clktop/per=pll0
+            (0x40040014 as *mut u32).write_volatile(0x00001FFF); //fd fclk = freq(clk0)
+            (0x40040018 as *mut u32).write_volatile(0x00011F7F); //fd aclk = freq(clk0 / 2)
+            (0x4004001C as *mut u32).write_volatile(0x00033F3F); //fd hclk = freq(clk0 / 4)
+            (0x40040020 as *mut u32).write_volatile(0x00033F1F); //fd iclk = freq(clk0 / 8)
+            (0x40040024 as *mut u32).write_volatile(0x00033F0F); //fd pclk = freq(clk0 / 16)
+            (0x4004003c as *mut u32).write_volatile(0x01_ff_ff); //perclk
+            (0x40040060 as *mut u32).write_volatile(0x2f);
+            (0x40040064 as *mut u32).write_volatile(0b1111_1101);
+            (0x40040068 as *mut u32).write_volatile(0x8f);
+            (0x4004006c as *mut u32).write_volatile(0xff);
+            (0x4004002c as *mut u32).write_volatile(0x32);
+            */
+        }
+        #[cfg(all(not(feature = "altclk"), not(feature = "v0p9")))]
+        unsafe {
+            uart.tiny_write_str("set clk asic2 500 fclk250\r");
+            let perclk = init_clock_asic2(500_000_000);
             print!("perclk: {}\r", perclk);
         }
     }
