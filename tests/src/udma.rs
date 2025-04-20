@@ -3,7 +3,8 @@ use core::convert::TryInto;
 use cramium_hal::board::SPIM_FLASH_IFRAM_ADDR;
 use cramium_hal::ifram::IframRange;
 use cramium_hal::iox::Iox;
-use cramium_hal::iox::{IoSetup, IoxDir, IoxDriveStrength, IoxEnable, IoxFunction, IoxPort};
+use cramium_api::iox::{IoSetup, IoxDir, IoxDriveStrength, IoxEnable, IoxFunction, IoxPort};
+use cramium_api::{I2cApi, PeriphId, I2cChannel, UdmaGlobalConfig};
 use cramium_hal::udma::*;
 
 use crate::*;

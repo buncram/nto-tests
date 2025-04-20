@@ -9,7 +9,8 @@
 // MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE.
 // Please see the [CERN-OHL- W-2.0] for applicable conditions.
 
-use cramium_hal::iox::{IoSetup, Iox, IoxDir, IoxEnable, IoxFunction, IoxPort};
+use cramium_hal::iox::Iox;
+use cramium_api::iox::{IoxDir, IoxEnable, IoxFunction, IoxPort, IoSetup};
 use utralib::generated::*;
 
 use crate::println;
