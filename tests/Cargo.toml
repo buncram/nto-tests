@@ -58,6 +58,7 @@ quirks-pll = []
 aes-zkn = []
 
 # test selections
+bio-quick = []
 aes-tests = ["aes-zkn"]
 reset-value-tests = []
 bio-tests = []

@@ -37,6 +37,8 @@ mod utils;
 
 mod asm;
 
+mod bioquick;
+
 pub use init::*;
 #[cfg(feature = "pio")]
 pub use pio::*;
@@ -100,6 +102,11 @@ macro_rules! impl_test {
 
 #[export_name = "rust_entry"]
 pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! {
+    #[cfg(feature = "bio-quick")]
+    unsafe {
+        bio_bypass();
+    }
+
     early_init();
     let mut uart = debug::Uart {};
     uart.tiny_write_str("hello world!\r");
