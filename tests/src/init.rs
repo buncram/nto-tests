@@ -415,6 +415,7 @@ pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
     let _cgufsfreq1 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ1.offset()).read_volatile();
     let _cgufsfreq2 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ2.offset()).read_volatile();
     let _cgufsfreq3 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ3.offset()).read_volatile();
+    /*
     crate::println!(
         "Internal osc: {} -> {} MHz ({} MHz)",
         _cgufsfreq0,
@@ -433,6 +434,7 @@ pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
         fsfreq_to_hz(_cgufsfreq2),
         fsfreq_to_hz_32(_cgufsfreq2)
     );
+    */
     crate::println!(
         "pll output 1: {} -> {} MHz ({} MHz)",
         _cgufsfreq3,
