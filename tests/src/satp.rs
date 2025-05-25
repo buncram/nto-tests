@@ -19,6 +19,7 @@ use utra::coreuser::{
 #[cfg(feature = "coreuser-compression")]
 use utralib::generated::*;
 
+use crate::utra::coreuser::{STATUS, STATUS_MM};
 use crate::*;
 
 const SATP_TESTS: usize = 1;
