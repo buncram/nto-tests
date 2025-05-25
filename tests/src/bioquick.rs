@@ -1,9 +1,8 @@
 use utralib::generated::*;
-use utralib::utra::sysctrl;
+use xous_bio_bdma::bio_tests::dma::TestPattern;
 use xous_bio_bdma::*;
 
 use crate::print;
-use xous_bio_bdma::bio_tests::dma::TestPattern;
 
 #[allow(dead_code)]
 pub unsafe fn bio_bypass() -> ! {
@@ -67,6 +66,7 @@ pub unsafe fn bio_bypass() -> ! {
     }
     */
     /*
+    use utralib::utra::sysctrl;
     let daric_cgu = sysctrl::HW_SYSCTRL_BASE as *mut u32;
     // let mut cgu = CSR::new(daric_cgu);
 
