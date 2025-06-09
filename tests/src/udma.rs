@@ -1,10 +1,10 @@
 use core::convert::TryInto;
 
+use cramium_api::iox::{IoSetup, IoxDir, IoxDriveStrength, IoxEnable, IoxFunction, IoxPort};
+use cramium_api::{I2cApi, I2cChannel, PeriphId, UdmaGlobalConfig};
 use cramium_hal::board::SPIM_FLASH_IFRAM_ADDR;
 use cramium_hal::ifram::IframRange;
 use cramium_hal::iox::Iox;
-use cramium_api::iox::{IoSetup, IoxDir, IoxDriveStrength, IoxEnable, IoxFunction, IoxPort};
-use cramium_api::{I2cApi, PeriphId, I2cChannel, UdmaGlobalConfig};
 use cramium_hal::udma::*;
 
 use crate::*;
@@ -21,7 +21,7 @@ impl TestRunner for UdmaTests {
         //   - Go to genblk1[5] in soc_ifsub.__gen_udma.udma.i_udma_core.u_rx_channels
         //   - View int_ch_curr_addr_o
         crate::println!("starting UDMA SPIM stress test");
-        let udma_global = GlobalConfig::new(utralib::generated::HW_UDMA_CTRL_BASE as *mut u32);
+        let udma_global = GlobalConfig::new();
 
         // setup the I/O pins
         let iox = Iox::new(utralib::generated::HW_IOX_BASE as *mut u32);
@@ -88,7 +88,8 @@ impl TestRunner for UdmaTests {
                 let mut passing = true;
                 for (i, chunk) in dest.chunks(4).enumerate() {
                     let checkval = u32::from_le_bytes(chunk.try_into().unwrap());
-                    let expected = 0xface_8000 + i as u32 + (test_iter as u32 + 1) * 16 / size_of::<u32>() as u32;
+                    let expected =
+                        0xface_8000 + i as u32 + (test_iter as u32 + 1) * 16 / size_of::<u32>() as u32;
                     if checkval != expected {
                         crate::println!("fail {}, expected {:x} got {:x}", i, expected, checkval);
                         passing = false;
@@ -120,7 +121,7 @@ pub const I2C_IFRAM_ADDR: usize = utralib::HW_IFRAM0_MEM + utralib::HW_IFRAM0_ME
 impl UdmaTests {
     pub fn i2c_test(&mut self) -> usize {
         let perclk = 100_000_000;
-        let udma_global = GlobalConfig::new(utralib::generated::HW_UDMA_CTRL_BASE as *mut u32);
+        let udma_global = GlobalConfig::new();
 
         // setup the I/O pins
         let iox = Iox::new(utralib::generated::HW_IOX_BASE as *mut u32);
@@ -149,7 +150,7 @@ impl UdmaTests {
         let mut check = [0u8; 4];
         crate::println!("Rx...");
         match i2c.i2c_read(dev, adr, &mut check, false) {
-            Ok(len) => {
+            Ok(cramium_api::I2cResult::Ack(len)) => {
                 if len != data.len() {
                     crate::println!("rbk length mismatch {} != {}", len, data.len());
                     passing = false;
@@ -160,6 +161,9 @@ impl UdmaTests {
                         passing = false;
                     }
                 }
+            }
+            Ok(u) => {
+                crate::println!("unexpected result {:?}", u);
             }
             Err(e) => {
                 crate::println!("read from {:x} failed {:?}", adr, e);
@@ -193,7 +197,7 @@ impl UdmaTests {
         };
         crate::println!("Rx...");
         match i2c.i2c_read(dev, adr, &mut check, true) {
-            Ok(len) => {
+            Ok(cramium_api::I2cResult::Ack(len)) => {
                 if len != data.len() {
                     crate::println!("rbk length mismatch {} != {}", len, data.len());
                     passing = false;
@@ -204,6 +208,9 @@ impl UdmaTests {
                         passing = false;
                     }
                 }
+            }
+            Ok(u) => {
+                crate::println!("unexpected result {:?}", u);
             }
             Err(e) => {
                 crate::println!("read from {:x} failed {:?}", adr, e);

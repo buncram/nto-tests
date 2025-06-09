@@ -1,7 +1,7 @@
-use cramium_hal::ifram::IframRange;
-use cramium_api::*;
-use cramium_hal::iox::*;
 use cramium_api::camera::Format;
+use cramium_api::*;
+use cramium_hal::ifram::IframRange;
+use cramium_hal::iox::*;
 use cramium_hal::udma::Udma;
 use cramium_hal::udma::*;
 use utralib::CSR;
@@ -39,7 +39,7 @@ pub struct TestCamera {
 }
 impl TestCamera {
     pub fn new() -> TestCamera {
-        let udma_global = cramium_hal::udma::GlobalConfig::new(utra::udma_ctrl::HW_UDMA_CTRL_BASE as *mut u32);
+        let udma_global = cramium_hal::udma::GlobalConfig::new();
         udma_global.clock_on(PeriphId::Cam);
         /*
         udma_global.map_event(
@@ -165,7 +165,9 @@ impl TestRunner for CamTests {
         tc.csr_mut().wo(REG_CAM_CFG_GLOB, 0x400);
 
         // this one is continuous so it never has to be re-initiated
-        unsafe { tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16 | CFG_CONT) }
+        unsafe {
+            tc.udma_enqueue(Bank::Rx, &tc.rx_buf_phys::<u16>()[..total_len], CFG_EN | CFG_SIZE_16 | CFG_CONT)
+        }
         // dummy read is necessary to drain the Tx FIFO
         let _ = tc.csr().r(utra::udma_camera::REG_CAM_CFG_GLOB);
         // re-enable frame sync for rx start
@@ -180,7 +182,7 @@ impl TestRunner for CamTests {
         let mut irq8 = CSR::<u32>::new(utra::irqarray8::HW_IRQARRAY8_BASE as *mut u32);
         // clear any pending interrupts
         irq8.wo(utra::irqarray8::EV_PENDING, 0xFFFF);
-       
+
         for i in 0..2 {
             while irq8.rf(utra::irqarray8::EV_PENDING_CAM_RX) == 0 {}
             // clear pending

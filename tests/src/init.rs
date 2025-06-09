@@ -286,7 +286,7 @@ pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
     // commit dividers
     daric_cgu.add(utra::sysctrl::SFR_CGUSET.offset()).write_volatile(0x32);
     crate::println!("gates set");
-    
+
     if (0 == (cgu.r(sysctrl::SFR_IPCPLLMN) & 0x0001F000))
         || (0 == (cgu.r(sysctrl::SFR_IPCPLLMN) & 0x00000fff))
     {
@@ -408,7 +408,11 @@ pub unsafe fn init_clock_asic2(freq_hz: u32) -> u32 {
         // printf ("    LPEN: 0x%01x, OSC: 0x%04x, BIAS: 0x%04x,\n",
         //     DARIC_IPC->lpen, DARIC_IPC->osc, DARIC_IPC->ipc);
     }
-    crate::println!("mn {:x}, q{:x}", (0x400400a0 as *const u32).read_volatile(), (0x400400a8 as *const u32).read_volatile());
+    crate::println!(
+        "mn {:x}, q{:x}",
+        (0x400400a0 as *const u32).read_volatile(),
+        (0x400400a8 as *const u32).read_volatile()
+    );
 
     crate::println!("fsvalid: {}", daric_cgu.add(sysctrl::SFR_CGUFSVLD.offset()).read_volatile());
     let _cgufsfreq0 = daric_cgu.add(sysctrl::SFR_CGUFSSR_FSFREQ0.offset()).read_volatile();
@@ -480,9 +484,9 @@ pub unsafe fn early_init() {
 // these register do not exist in our local simulation model
 pub fn setup_uart2() {
     const UART_IFRAM_ADDR: usize = utralib::HW_IFRAM0_MEM + utralib::HW_IFRAM0_MEM_LEN - 4096;
-    use cramium_hal::iox::Iox;
     use cramium_api::iox::{IoxDir, IoxEnable, IoxFunction, IoxPort};
     use cramium_api::udma::*;
+    use cramium_hal::iox::Iox;
     use cramium_hal::udma;
     use cramium_hal::udma::Udma;
 
@@ -514,7 +518,7 @@ pub fn setup_uart2() {
     iox.set_gpio_dir(IoxPort::PD, 14, IoxDir::Output);
 
     // Set up the UDMA_UART block to the correct baud rate and enable status
-    let udma_global = udma::GlobalConfig::new(utra::udma_ctrl::HW_UDMA_CTRL_BASE as *mut u32);
+    let udma_global = udma::GlobalConfig::new();
     udma_global.clock_on(PeriphId::Uart1);
     udma_global.map_event(
         PeriphId::Uart1,
