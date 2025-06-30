@@ -550,7 +550,7 @@ LDFLAGS += -lstdc++
 LDFLAGS += -Wl,--gc-sections,$(addprefix -T,$(LD_FILES))
 LDFLAGS += --debug
 LDFLAGS += $(MALLOC_UNDEFINES)
-LDFLAGS += -Wl,--specs=nano.specs
+LDFLAGS += --specs=nano.specs
 
 ######### Rules
 
