@@ -63,7 +63,7 @@ int32_t deserialize_rx(mbox_pkt_t *mbox_pkt);
 void dct_naive(int8_t data_in[8][8], int16_t data_out[8][8]);
 void clifford(uint8_t *buf);
 
-#define CCR *((volatile uint32_t *)0xE000ED14)
+#define CCR_REG *((volatile uint32_t *)0xE000ED14)
 
 #define UNROLL 0
 
@@ -544,33 +544,88 @@ static void Platform_Init(void)
     ARM_MPU_Enable(MPU_CTRL_PRIVDEFENA_Msk);
 }
 
+// Add this function to debug your MPU configuration
+void debug_mpu_regions(void)
+{
+    print_string("=== MPU Region Debug ===\r\n");
+
+    for (int i = 0; i < 8; i++)
+    {
+        // Select region
+        MPU->RNR = i;
+
+        print_string("Region ");
+        send_u32_hex(i);
+        print_string(": RBAR=");
+        send_u32_hex(MPU->RBAR);
+        print_string(" RASR=");
+        send_u32_hex(MPU->RASR);
+        print_string("\r\n");
+    }
+
+    print_string("MPU CTRL: ");
+    send_u32_hex(MPU->CTRL);
+    print_string("\r\n");
+}
+
+void configure_cacheable_mpu(void)
+{
+    print_string("Configuring MPU for DCache...\r\n");
+
+    ARM_MPU_Disable();
+
+    // Region 6: Main SRAM (0x61000000) - cacheable write-back
+    uint32_t rbar_sram = ARM_MPU_RBAR(6, 0x61000000);
+    uint32_t rasr_sram = ARM_MPU_RASR(0, ARM_MPU_AP_FULL, 0, 1, 1, 1, 0, ARM_MPU_REGION_SIZE_2MB);
+    ARM_MPU_SetRegion(rbar_sram, rasr_sram);
+
+    // Region 7: Peripherals (0x40000000) - non-cacheable device memory
+    uint32_t rbar_periph = ARM_MPU_RBAR(7, 0x40000000);
+    uint32_t rasr_periph = ARM_MPU_RASR(0, ARM_MPU_AP_FULL, 2, 1, 0, 0, 0, ARM_MPU_REGION_SIZE_1GB);
+    ARM_MPU_SetRegion(rbar_periph, rasr_periph);
+
+    ARM_MPU_Enable(MPU_CTRL_PRIVDEFENA_Msk);
+
+    print_string("MPU configured for caching\r\n");
+}
+
 void main_loop()
 {
-    /*
-     * Perform platform initialization: MPU must be configured BEFORE
-     * the Data Cache is enabled.
-     */
+    // Platform initialization - MPU must be configured before enabling DCache
     Platform_Init();
-
-    // COMMENT OUT THESE UNDEFINED FUNCTIONS
-    // setupTicks();
-    // ticksDelay(10000);
-
     print_string("CM7 up\r\n");
 
+    configure_cacheable_mpu();
+    debug_mpu_regions();
+
+    // Enable instruction and data caches
     print_string("Enabling Caches...\r\n");
 
-    // Debug each cache enable separately
-    print_string("About to enable ICache...\r\n");
     SCB_EnableICache();
     print_string("ICache enabled\r\n");
 
-    print_string("About to enable DCache...\r\n");
-    // SCB_EnableDCache(); // <<< RE-ENABLE THE DATA CACHE
-    // print_string("DCache enabled)\r\n");
+    // SCB->CCR |= SCB_CCR_DC_Msk;
+    // print_string("DCache enabled!\r\n");
 
-    print_string("Hardware init complete. Entering ThreadX kernel...\r\n");
+    // // Basic memory test using stack variables
+    // print_string("Testing memory with DCache...\r\n");
+    // uint32_t test_val = 0x12345678;
+
+    // if (test_val == 0x12345678)
+    // {
+    //     print_string("Memory test OK\r\n");
+    // }
+
+    // // Disable DCache before ThreadX (cache clean operations cause hang)
+    print_string("Disabling DCache for ThreadX compatibility...\r\n");
+    SCB->CCR &= ~SCB_CCR_DC_Msk;
+    print_string("DCache disabled\r\n");
+
+    print_string("Entering ThreadX...\r\n");
     tx_kernel_enter();
+
+    // Should never reach here
+    print_string("ERROR: Returned from ThreadX!\r\n");
 }
 
 #define ROUND_INT8(f) ((int8_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
