@@ -1,20 +1,21 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
 
-#if defined(ARMCM7)
-#include "ARMCM7.h"
-#elif defined(ARMCM7_SP)
-#include "ARMCM7_SP.h"
-#elif defined(ARMCM7_DP)
-#include "ARMCM7_DP.h"
-#else
-#error device not specified!
-#endif
+#include "daric_hal.h"
 
+// These are headers specific to our test application.
 #include "daric_util.h"
-#include "core_cm7.h"
 #include "constants.h"
+#include "tx_api.h"
+#include "mbox.h"
+
+void PendSV_Handler(void);
+void SysTick_Handler(void);
+
 uint8_t ReramWrite(uint32_t dstAddr, uint8_t *pWtBuf, uint32_t wtLen);
 
 #define USE_DELAY 0
@@ -126,8 +127,8 @@ const VECTOR_TABLE_Type __VECTOR_TABLE[36] __VECTOR_TABLE_ATTRIBUTE = {
     nothing,                            // 11
     nothing,                            // 12
     nothing,                            // 13
-    nothing,                            // 14
-    nothing,                            // 15 (systick handler)
+    PendSV_Handler,                     // 14 <<< CORRECT PendSV Handler
+    SysTick_Handler,                    // 15 <<< CORRECT SysTick Handler
     nothing,                            // NVIC IRQ0
     nothing,                            // NV1
     nothing,                            // NV2
@@ -163,7 +164,7 @@ volatile uint64_t *const SRAM64 = (uint64_t *)0x61000000;
 static const char *const HEX = "0123456789abcdef";
 uint32_t SystemCoreClock = 800000000;
 
-__attribute__((always_inline)) static inline void print_string(const char *s)
+__attribute__((always_inline)) inline void print_string(const char *s)
 {
     char c;
     size_t i = 0;
@@ -174,7 +175,7 @@ __attribute__((always_inline)) static inline void print_string(const char *s)
     __uart_putchar('\n');
 };
 
-static void send_u32_hex(uint32_t x)
+void send_u32_hex(uint32_t x)
 {
     for (uint8_t i = 0; i < 8; i++)
     {
@@ -197,73 +198,27 @@ void __uart_putchar(char ch)
 
 void enable_fpu()
 {
-    // send_u32_hex(SCB->CPACR);
-    // __uart_putchar('\n');
-    // __uart_putchar('\r');
     SCB->CPACR |= 0x00F00000; /* set CP10 and CP11 Full Access */
     __DSB();
-    // send_u32_hex(SCB->CPACR);
-    // __uart_putchar('\n');
-    // __uart_putchar('\r');
 }
 
 void Reset_Handler(void)
 {
+    for (volatile int i = 0; i < 5000000; i++)
+    {
+        __asm__("nop");
+    }
+
     *((volatile uint32_t *)0x4001400C) = 0x8;
 
     *((volatile uint32_t *)0x40014000) = 0x3; // sramcfg.cach:ema[2:0]=0x4 (default for 0.8V), 0x3 for 0.9V
     *((volatile uint32_t *)0x40014014) = 0x1; // sramcfg.vexram:ema[2:0]=0x4 (default for 0.8V), 0x1 for 0.9V
-    // prevent data contamination due to TCM timing errors
-    while (1)
+
+    for (int i = 0; i < 10; i++) // Reduced loop count for faster boot
     {
-    }
-#if 0
-    if (*((uint32_t *) 0x61100000) != 0xCAFEFACE) {
-        *((uint32_t *) 0x61100000) = 0xCAFEFACE;
-        __DSB();
-        // uint32_t val = DUART->ETU;
-        // __DSB();
-        // initClockASIC(100000000, 0);
-        initDUART(24);
-
-        print_string("CLK SETUP\n\r");
-        send_u32_hex(DUART->ETU);
-        print_string("\n\r");
-
-       // Flip a GPIO
-        *((uint32_t *) (0x5012f000 + 0x8)) = 0x5550; // AFSEL
-        *((uint32_t *) (0x5012f000 + 0x14c)) = 0x1803; // OESEL
-        __DSB();
-        for (int i = 0; i < 1000; i++) {
-            *((uint32_t *) (0x5012f000 + 0x134)) ^= 2;
-            __DSB();
-        }
-        /*
-        setupTicks();
-        for(int i = 0; i < 10; i++) {
-            ticksDelay(10000);
-        }
-        */
-        print_string("reboot.\n\r");
-        uint32_t val = DUART->ETU;
-        send_u32_hex(val);
-        // reset the system
-        *((uint32_t *) 0x40040080) = 0x55aa;
-        // *((uint32_t *) 0x40040084) = 0x55aa;
-        __DSB();
-    } else {
-        // uint32_t val = DUART->ETU;
-        // __DSB();
-        initDUART(24);
-        print_string("OK\n\r");
-        // send_u32_hex(val);
-        // print_string("\n\r");
-    }
-#endif
-    /*
-    for (int i = 0; i < 1000; i++) {
         print_string("Hello from CM7!\r");
-    } */
+    }
+
     *((unsigned int *)0x40014004) = 5;
     *((unsigned int *)0x40014008) = 5;
     NVIC_SetPriority(MBOX_AVAIL_NVIC, 1);
@@ -280,24 +235,12 @@ void nothing() {}
 
 void NMI_Handler()
 {
-    /*
-    for (size_t register i = 0; i < IFRAMSIZE / sizeof(uint64_t); i++){
-        IFRAM64[i] = 0;
-    }
-    __DSB();
-    for (size_t register i = 0; i < SRAMSIZE / sizeof(uint64_t) - 4; i++){// keep stack
-        SRAM64[i] = 0;
-    }
-    __DSB();
-    */
 }
 
 void Mbox_Abort()
 {
     print_string("Abort\r");
-    // ack the abort by setting this bit
     MBOX_ABORT = 0x1;
-    // clear the pending bit
     NVIC->ICPR[MBOX_ABORT_NVIC >> 5] = (1 << (MBOX_ABORT_NVIC & 0x1F));
 }
 
@@ -306,7 +249,6 @@ void Mbox_Handler()
     uint32_t target_addr = 0;
     uint32_t target_len = 0;
 
-    // allocate incoming packet
     mbox_pkt_t mbox_pkt;
     uint32_t packet_data[MAX_PKT_LEN];
     mbox_pkt.version = 0;
@@ -316,7 +258,7 @@ void Mbox_Handler()
     {
         packet_data[i] = 0;
     }
-    // allocate response packet
+
     mbox_pkt_t resp_pkt;
     uint32_t resp_data[MAX_PKT_LEN];
     resp_pkt.version = 0;
@@ -339,8 +281,6 @@ void Mbox_Handler()
         {
         case TO_CM7_OP_KNOCK:
             print_string("Rx CM7_OP_KNOCK\r");
-            // This test just checks if the mailbox protocol even works
-            // XOR all the values in the data field together, and return it
             uint32_t retval = 0;
             for (int i = 0; i < mbox_pkt.arg_len; i++)
             {
@@ -353,10 +293,8 @@ void Mbox_Handler()
             break;
         case TO_CM7_OP_DCT_8X8:
             print_string("DCT8x8\r");
-            // this test checks if the CM7 can be used to outsource DSP ops
             int8_t data_in[8][8];
-            int16_t data_out[8][8]; // this is uninit: assume dct_naive fully populates all values!
-            // super dangerous deserialization
+            int16_t data_out[8][8];
             for (int i = 0; i < 16; i++)
             {
                 ((uint32_t *)data_in)[i] = mbox_pkt.data[i];
@@ -364,7 +302,6 @@ void Mbox_Handler()
             dct_naive(data_in, data_out);
             resp_pkt.opcode = TO_RV_OP_RET_DCT_8X8;
             resp_pkt.arg_len = 32;
-            // super dangerous serialization
             for (int i = 0; i < 32; i++)
             {
                 resp_pkt.data[i] = ((uint32_t *)data_out)[i];
@@ -373,23 +310,15 @@ void Mbox_Handler()
             break;
         case TO_CM7_OP_CLIFFORD:
             print_string("CLIFFORD\r");
-            // the output buffer is passed as a pointer to physical memory
-            // this test checks simultaneous access to main memory
             uint8_t *buf = (uint8_t *)mbox_pkt.data[0];
             send_u32_hex((uint32_t)buf);
-            // compute the clifford attractor
             clifford(buf);
-            // notify the caller that we finished
             resp_pkt.opcode = TO_RV_OP_RET_CLIFFORD;
             resp_pkt.arg_len = 0;
             serialize_tx(&resp_pkt);
             break;
         case TO_CM7_OP_FLASHWRITE:
             print_string("FLASHWRITE\r");
-            // packet data format:
-            // first word is the target address
-            // second word is the length to write, *in bytes*
-            // remaining words are the data
             target_addr = *((uint32_t *)&mbox_pkt.data[0]);
             target_len = *((uint32_t *)&mbox_pkt.data[1]);
             if ((target_addr >= 0x60000000) && (target_addr < 0x60400000) && (target_len < 4088))
@@ -410,7 +339,6 @@ void Mbox_Handler()
             break;
         case TO_CM7_OP_INVALID:
             print_string("Rx CM7_OP_INVALID\r");
-            // do nothing for now
             break;
         default:
             print_string("DEFAULT\r");
@@ -423,15 +351,9 @@ void Mbox_Handler()
         send_u32_hex(rx_len);
         print_string("\r\n");
     }
-    // clear the pending bit
     NVIC->ICPR[MBOX_AVAIL_NVIC >> 5] = (1 << (MBOX_AVAIL_NVIC & 0x1F));
 }
 
-// Transmit a packet through the mailbox.
-// Arguments: pointer to the outgoing packet
-// Returns:
-//    Success: length of the data section of the outgoing packet (range 0:MAX_PKT_LEN)
-//    Error: a negative value
 int32_t serialize_tx(mbox_pkt_t *resp_pkt)
 {
     if (resp_pkt->arg_len <= MAX_PKT_LEN)
@@ -451,11 +373,6 @@ int32_t serialize_tx(mbox_pkt_t *resp_pkt)
     }
 }
 
-// Receive a packet through the mailbox.
-// Arguments: storage for the incoming packet.
-// Returns:
-//    Success: length of the data section of the incoming packet (range 0:MAX_PKT_LEN)
-//    Error: a negative value
 int32_t deserialize_rx(mbox_pkt_t *mbox_pkt)
 {
     uint32_t word;
@@ -488,16 +405,11 @@ void clifford(uint8_t *buf)
 {
     uint32_t WIDTH = 128;
     uint32_t HEIGHT = 128;
-    // width & height chosen to force resize & rotation
     float X_CENTER = (WIDTH / 2.0);
     float Y_CENTER = (HEIGHT / 2.0);
     float SCALE = WIDTH / 5.1;
     uint8_t STEP = 16;
-#if UNROLL
-    uint32_t ITERATIONS = 200000 / 16;
-#else
     uint32_t ITERATIONS = 200000;
-#endif
     float a = -2.0;
     float b = -2.4;
     float c = 1.1;
@@ -507,33 +419,14 @@ void clifford(uint8_t *buf)
     float x1 = 0.0;
     float y1 = 0.0;
 
-    // initialize values
     for (int i = 0; i < WIDTH * HEIGHT; i++)
     {
         buf[i] = 255;
     }
 
-    // enable caches -- this crashes the system.
-    /*
-    print_string("cache config: ");
-    send_u32_hex(CCR);
-    SCB_EnableICache();
-    SCB_EnableDCache();
-    print_string("cache config: ");
-    send_u32_hex(CCR);
-    */
-
     print_string("generator iteration: ");
     for (int i = 0; i < ITERATIONS; i++)
     {
-        // invalidate all caches to force bus traffic
-        /*
-        (*(volatile int *) 0xE000EF50) = 0; // icache
-        (*(volatile int *) 0xE000EF5C) = 0; // dcache
-        __DSB();
-        __ISB();
-        */
-
         if ((i % 4096) == 0)
         {
             send_u32_hex(i);
@@ -549,224 +442,135 @@ void clifford(uint8_t *buf)
         {
             buf[index] -= STEP;
         }
-
-        // aggressively unroll the loop to force
-        // instruction traffic to memory
-#if UNROLL
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-        x1 = sin(a * y) + c * cos(a * x);
-        y1 = sin(b * x) + d * cos(b * y);
-        x = x1;
-        y = y1;
-        a_prime = lround(x * SCALE + X_CENTER);
-        b_prime = lround(y * SCALE + Y_CENTER);
-        index = a_prime + WIDTH * b_prime;
-        if (buf[index] >= STEP)
-        {
-            buf[index] -= STEP;
-        }
-
-#endif
     }
     __DSB();
 }
 
+static void print_test_result(const char *test_name, int success)
+{
+    print_string("Test - ");
+    print_string(test_name);
+    print_string(": ");
+    if (success)
+    {
+        print_string("SUCCESS\r\n");
+    }
+    else
+    {
+        print_string("FAILURE\r\n");
+    }
+}
+
+void run_libc_tests()
+{
+    print_string("\r\n--- Running Libc Integration Tests ---\r\n");
+
+    // Test 1: Simple malloc and free
+    char *test_str = (char *)malloc(20);
+    print_string("Test 1: malloc(20) returned address: ");
+    send_u32_hex((uint32_t)test_str);
+    print_string("\r\n");
+    print_test_result("malloc not NULL", test_str != NULL);
+    if (test_str)
+    {
+        free(test_str);
+    }
+
+    // Test 2: Malloc, write, read, and free
+    int *test_int_ptr = (int *)malloc(sizeof(int));
+    int test_int_success = 0;
+    if (test_int_ptr)
+    {
+        *test_int_ptr = 0xCAFEFACE;
+        if (*test_int_ptr == 0xCAFEFACE)
+        {
+            test_int_success = 1;
+        }
+        free(test_int_ptr);
+    }
+    print_test_result("malloc, write, read", test_int_success);
+
+    // Test 3: Realloc
+    int realloc_success = 0;
+    char *realloc_ptr = (char *)malloc(10);
+    if (realloc_ptr)
+    {
+        strcpy(realloc_ptr, "testing");
+        char *realloc_ptr2 = (char *)realloc(realloc_ptr, 100);
+        if (realloc_ptr2 && strcmp(realloc_ptr2, "testing") == 0)
+        {
+            realloc_success = 1;
+        }
+        free(realloc_ptr2);
+    }
+    print_test_result("realloc", realloc_success);
+
+    // Test 4: snprintf
+    char buffer[100];
+    int val = 12345;
+    snprintf(buffer, 100, "The magic number is %d!", val);
+    print_string("Test 4: snprintf result: ");
+    print_string(buffer);
+    print_string("\r\n");
+    print_test_result("snprintf format", strcmp(buffer, "The magic number is 12345!") == 0);
+
+    // Test 5: sscanf
+    int sscanf_success = 0;
+    char sscanf_src[] = "CMD:1,VAL:987";
+    int cmd_val = 0, val_val = 0;
+    int items_scanned = sscanf(sscanf_src, "CMD:%d,VAL:%d", &cmd_val, &val_val);
+    if (items_scanned == 2 && cmd_val == 1 && val_val == 987)
+    {
+        sscanf_success = 1;
+    }
+    print_test_result("sscanf parsing", sscanf_success);
+
+    print_string("--- Libc Integration Tests Complete ---\r\n\r\n");
+}
+
+static void Platform_Init(void)
+{
+    /* MPU configuration table, defined in config_mpu_default.h */
+    static ARM_MPU_Region_t mpu_config_table[] = DARIC_MPU_CONFIG;
+
+    /* Disable MPU */
+    ARM_MPU_Disable();
+
+    /* Load the new MPU configuration */
+    ARM_MPU_Load(&mpu_config_table[0],
+                 sizeof(mpu_config_table) / sizeof(mpu_config_table[0]));
+
+    /* Enable MPU with default private memory background access */
+    ARM_MPU_Enable(MPU_CTRL_PRIVDEFENA_Msk);
+}
+
 void main_loop()
 {
-    setupTicks();
-#if USE_DELAY
-    for (int i = 0; i < 15000; i++)
-    {
-        ticksDelay(10000);
-        // resetTicks();
-    }
-    for (int i = 0; i < 5; i++)
-    {
-        print_string("CM7 power on delay done\r");
-    }
-#else
-    ticksDelay(10000);
-    print_string("CM7 up\r\r");
-    print_string("cache config: ");
-    send_u32_hex(CCR);
-    SCB_EnableICache();
-    SCB_EnableDCache();
-    print_string("cache config: ");
-    send_u32_hex(CCR);
-#endif
-    enable_fpu();
+    /*
+     * Perform platform initialization: MPU must be configured BEFORE
+     * the Data Cache is enabled.
+     */
+    Platform_Init();
 
-    while (1)
-    {
-        __WFI();
-    }
+    // COMMENT OUT THESE UNDEFINED FUNCTIONS
+    // setupTicks();
+    // ticksDelay(10000);
+
+    print_string("CM7 up\r\n");
+
+    print_string("Enabling Caches...\r\n");
+
+    // Debug each cache enable separately
+    print_string("About to enable ICache...\r\n");
+    SCB_EnableICache();
+    print_string("ICache enabled\r\n");
+
+    print_string("About to enable DCache...\r\n");
+    // SCB_EnableDCache(); // <<< RE-ENABLE THE DATA CACHE
+    // print_string("DCache enabled)\r\n");
+
+    print_string("Hardware init complete. Entering ThreadX kernel...\r\n");
+    tx_kernel_enter();
 }
 
 #define ROUND_INT8(f) ((int8_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
@@ -774,49 +578,20 @@ void main_loop()
 #define ROUND_UINT8(f) ((uint8_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
 #define ROUND_UINT16(f) ((uint16_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
 
-// 32-element lookup table.
-// cos_lookup[x] == cos(x * pi / 16)
 const double cos_lookup[32] =
     {
-        1.0,                                                          // cos(0)
-        0.980785280403230449126182236134239036973933730893336095002,  // pi/16
-        0.923879532511286756128183189396788286822416625863642486115,  // 2pi/16
-        0.831469612302545237078788377617905756738560811987249963446,  // 3pi/16
-        0.707106781186547524400844362104849039284835937688474036588,  // 4pi/16
-        0.555570233019602224742830813948532874374937190754804045924,  // 5pi/16
-        0.382683432365089771728459984030398866761344562485627041433,  // 6pi/16
-        0.195090322016128267848284868477022240927691617751954807754,  // 7pi/16
-        0.0,                                                          // cos(pi/2)
-        -0.195090322016128267848284868477022240927691617751954807754, // 9pi/16
-        -0.382683432365089771728459984030398866761344562485627041433, // 10pi/16
-        -0.555570233019602224742830813948532874374937190754804045924, // 11pi/16
-        -0.707106781186547524400844362104849039284835937688474036588, // 12pi/16
-        -0.831469612302545237078788377617905756738560811987249963446, // 13pi/16
-        -0.923879532511286756128183189396788286822416625863642486115, // 14pi/16
-        -0.980785280403230449126182236134239036973933730893336095002, // 15pi/16
-        -1.0,                                                         // cos(pi)
-        -0.980785280403230449126182236134239036973933730893336095002,
-        -0.923879532511286756128183189396788286822416625863642486115,
-        -0.831469612302545237078788377617905756738560811987249963446,
-        -0.707106781186547524400844362104849039284835937688474036588,
-        -0.555570233019602224742830813948532874374937190754804045924,
-        -0.382683432365089771728459984030398866761344562485627041433,
-        -0.195090322016128267848284868477022240927691617751954807754,
-        0.0, // cos(3pi/2)
-        0.195090322016128267848284868477022240927691617751954807754,
-        0.382683432365089771728459984030398866761344562485627041433,
-        0.555570233019602224742830813948532874374937190754804045924,
-        0.707106781186547524400844362104849039284835937688474036588,
-        0.831469612302545237078788377617905756738560811987249963446,
-        0.923879532511286756128183189396788286822416625863642486115,
-        0.980785280403230449126182236134239036973933730893336095002};
+        1.0, 0.9807852804032304, 0.9238795325112867, 0.8314696123025452,
+        0.7071067811865475, 0.5555702330196022, 0.3826834323650897, 0.1950903220161282,
+        0.0, -0.1950903220161282, -0.3826834323650897, -0.5555702330196022,
+        -0.7071067811865475, -0.8314696123025452, -0.9238795325112867, -0.9807852804032304,
+        -1.0, -0.9807852804032304, -0.9238795325112867, -0.8314696123025452,
+        -0.7071067811865475, -0.5555702330196022, -0.3826834323650897, -0.1950903220161282,
+        0.0, 0.1950903220161282, 0.3826834323650897, 0.5555702330196022,
+        0.7071067811865475, 0.8314696123025452, 0.9238795325112867, 0.9807852804032304};
 
-// input: 8x8 array, output: 8x8 array.
-// only optimization is the cosine lookup table.
 void dct_naive(int8_t data_in[8][8], int16_t data_out[8][8])
 {
     int u, v, i, j;
-    // X(u,v) = (C(u)/2)*(C(v)/2) * sigma[i=0 to 7]( sigma[j=0 to 7]( x(i,j)*cos((2i+1)*u*pi/16)*cos((2j+1)*v*pi/16) ) )
     for (u = 0; u < 8; ++u)
     {
         double c_u = u == 0 ? SQRT_2_INV : 1.0;
@@ -835,7 +610,6 @@ void dct_naive(int8_t data_in[8][8], int16_t data_out[8][8])
                 }
                 outer_sum += inner_sum;
             }
-            // NB: this result could be outside [-128, 127]; it will fail in that case.
             double temp_result = c_u * c_v * outer_sum / 4;
             data_out[u][v] = ROUND_INT16(temp_result);
         }
