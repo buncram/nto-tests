@@ -1,4 +1,6 @@
 // See LICENSE file for license
+#include <stddef.h>
+#include <stdint.h>
 
 #ifndef __daric_util_h_inclided__
 #define __daric_util_h_inclided__
@@ -104,19 +106,20 @@ extern "C"
     void HardFault_Handler(void);
     // ... other function prototypes ...
     void initDUART(uint32_t etu);
+    void print_string(const char *s);
 #ifdef __cplusplus
 }
 #endif
 
-__attribute__((always_inline)) static inline void printString(const char *s)
-{
-    char c;
-    size_t i = 0;
-    while ((c = s[i++]) != 0)
-    {
-        __uart_putchar(c);
-    }
-    __uart_putchar('\n');
-};
+// __attribute__((always_inline)) static inline void printString(const char *s)
+// {
+//     char c;
+//     size_t i = 0;
+//     while ((c = s[i++]) != 0)
+//     {
+//         __uart_putchar(c);
+//     }
+//     __uart_putchar('\n');
+// };
 
 #endif // __daric_util_h_inclided__
