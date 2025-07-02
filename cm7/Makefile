@@ -45,10 +45,21 @@ TFLM_EXCLUDE_SRCS := \
 	$(TFLM_ROOT)/hello_world_int8_model_data.su \
 	$(TFLM_ROOT)/micro_speech_quantized_model_data.su \
 	$(TFLM_ROOT)/person_detect_model_data.su \
-	$(TFLM_ROOT)/audio_preprocessor_int8_model_data.su
+	$(TFLM_ROOT)/audio_preprocessor_int8_model_data.su \
+    $(TFLM_ROOT)/examples/person_detection/main.cc \
+	$(TFLM_ROOT)/tensorflow/lite/micro/debug_log.cc
 
 TFLM_CORE_SRCS_C := $(filter-out $(TFLM_EXCLUDE_SRCS), $(TFLM_CORE_SRCS_C))
 TFLM_CORE_SRCS_CXX := $(filter-out $(TFLM_EXCLUDE_SRCS), $(TFLM_CORE_SRCS_CXX))
+
+# # ADD THIS ENTIRE DEBUG BLOCK IMMEDIATELY AFTER THE LINE ABOVE
+# $(info --- DEBUG: Files to Exclude ---)
+# $(foreach file,$(TFLM_EXCLUDE_SRCS),$(info $(file)))
+# $(info ---)
+# $(info --- DEBUG: CXX files AFTER filtering ---)
+# $(foreach file,$(TFLM_CORE_SRCS_CXX),$(info $(file)))
+# $(info --- End Debug ---)
+
 
 # Explicitly add the example-specific source files that are clearly present
 # We see these under tflm/examples/person_detection directly.
@@ -59,8 +70,8 @@ PERSON_DETECTION_SRCS_CXX := \
 	$(TFLM_ROOT)/examples/person_detection/detection_responder.cc \
 	$(TFLM_ROOT)/examples/person_detection/image_provider.cc
 
-# HELLO_WORLD_SRCS_CXX := \
-    # $(TFLM_ROOT)/examples/hello_world/hello_world_test.cc
+HELLO_WORLD_SRCS_CXX := \
+    $(TFLM_ROOT)/examples/hello_world/hello_world_test.cc
 
 # Signal library sources (needed by micro_speech)
 SIGNAL_SRCS_CXX := \
@@ -101,12 +112,12 @@ KISSFFT_SRCS_C := $(TFLM_ROOT)/third_party/kissfft/kiss_fft.c
 
 # Add your existing project C++ sources that you defined
 PROJECT_CXX_SRCS := \
-	debug_log.cc \
 	micro_time.cc \
 	system_setup.cc \
 	tflm_platform_utils.cc \
     dso_handle.cc \
-    # tflm_hello_world_wrapper.cc
+    tflm_hello_world_wrapper.cc \
+	#debug_log.cc
 
 # --- Automatically find all source files in those directories ---
 THREADX_COMMON_SRCS_C := $(wildcard $(THREADX_COMMON_PATH)/*.c)
@@ -115,7 +126,7 @@ THREADX_PORT_SRCS_S   := $(wildcard $(THREADX_PORT_PATH)/*.S)
 THREADX_INIT_SRC_S	:= $(wildcard $(THREADX_PORT_EXAMPLE_PATH)/tx_initialize_low_level.S)
 
 # --- Create final source lists ---
-PROJECT_SRCS = mbox.c daric_util.c reram.c threadx_app_setup.c
+PROJECT_SRCS = mbox.c daric_util.c reram.c threadx_app_setup.c tflm_debug_log.c
 LIBC_HOOK_SRCS = libc-hooks.c
 
 C_SRCS := \
@@ -135,7 +146,6 @@ CXX_SRCS := \
 	# $(PERSON_DETECTION_SRCS_CXX) \
 	# $(SIGNAL_SRCS_CXX) \
 	# $(MICRO_SPEECH_TEST_SRCS_CXX)
-
 
 
 S_SRCS := \
@@ -182,11 +192,13 @@ VPATH := $(APP_SETUP_PATH) \
 		 $(TFLM_ROOT)/third_party/ruy \
 		 $(TFLM_ROOT)/third_party/ruy/ruy
 
-# =========================================================================
+# Add these flags to enable floating point support in printf/scanf
+PRINTF_FLOAT_LDFLAGS := -Wl,-u,vfprintf
+PRINTF_FLOAT_LDLIBS  := -lprintf_flt
 
 # --- Finalized Compiler Flags ---
 # Use soft-float for libc compatibility, but tell the toolchain the FPU exists for assembly/context-switching.
-COMMONFLAGS += -mfloat-abi=soft -mfpu=fpv5-d16 -DARMCM7
+COMMONFLAGS += -mfloat-abi=hard -mfpu=fpv5-d16 -DARMCM7 -D__FPU_PRESENT=1
 COMMONFLAGS += -time -O3 -g -fno-exceptions
 
 CXXFLAGS += -fno-strict-aliasing -fstack-usage -std=c++17 -fno-rtti
@@ -199,9 +211,9 @@ TFLM_DEFS := \
 	-DTF_LITE_DISABLE_RTTI \
 	-DTF_LITE_DISABLE_EXCEPTIONS \
 	-DTF_LITE_MCU_NAME=CORTEX_M7 \
-	-DTF_LITE_OPTIMIZE_DEBUG_LOGS \
 	-DTFLM_USE_CMSIS_NN \
-	-DTFLM_USE_FFT
+	-DTFLM_USE_FFT \
+	# -DTF_LITE_OPTIMIZE_DEBUG_LOGS
 
 FIDO2_CONFIG_DEFS := \
 	-DCONFIG_ARCH=arm -DCONFIG_ARM=y -DCONFIG_AW9523B=y -DCONFIG_BATT_CHG=y \
@@ -259,6 +271,7 @@ TFLM_INCLUDES := \
     -I$(TFLM_ROOT)/examples/micro_speech \
     -I$(TFLM_ROOT)/examples/micro_speech/testdata \
     -I$(TFLM_ROOT)/examples/hello_world \
+    -I$(TFLM_ROOT)/examples/hello_world/models \
     -I$(TFLM_ROOT)/signal/micro/kernels \
     -I$(TFLM_ROOT)/signal/src \
     -I$(TFLM_ROOT)/signal/src/kiss_fft_wrappers \
@@ -278,7 +291,7 @@ CXXFLAGS += $(INCLUDES) $(FIDO2_CONFIG_INCLUDES) $(TFLM_INCLUDES) $(FIDO2_CONFIG
 
 # --- Finalized Linker Flags ---
 MALLOC_UNDEFINES := -Wl,-u,malloc,-u,calloc,-u,free,-u,realloc,-u,_malloc_r,-u,_calloc_r,-u,_free_r,-u,_realloc_r,-u,aligned_alloc
-LDFLAGS += $(COMMONFLAGS) -Wl,--gc-sections,$(addprefix -T,$(LD_FILES)) --debug $(MALLOC_UNDEFINES) --specs=nano.specs
+LDFLAGS += $(COMMONFLAGS) -Wl,--gc-sections,$(addprefix -T,$(LD_FILES)) --debug $(MALLOC_UNDEFINES) --specs=nano.specs -u _printf_float
 LDLIBS   = -lm -lstdc++
 
 ######### Rules #########

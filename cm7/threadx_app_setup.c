@@ -1,6 +1,9 @@
 #include "tx_api.h"
-#include "mbox.h" // For run_libc_tests() and print_string()
+#include "mbox.h"
 #include "daric_hal.h"
+
+// Declare the C-linkage function from the TFLM wrapper
+extern void run_tflm_hello_world_test(void);
 
 /*
  * This is the memory pool that our custom malloc() in libc-hooks.c
@@ -8,75 +11,66 @@
  */
 TX_BYTE_POOL DefaultHeap;
 
-/**
- * @brief  This is the main entry point for defining ThreadX objects.
- * The kernel calls this function during startup.
- * @param  first_unused_memory: Pointer to the first unused memory address.
- * @retval None
- */
 void tx_application_define(void *first_unused_memory)
 {
     UINT status;
 
-/*
- * Define the heap area. It's important that this memory is not used for
- * anything else (like the stack or global variables). A large static
- * array is a safe way to reserve it.
- */
-#define MALLOC_HEAP_SIZE (16 * 1024) // 16KB heap
+#define MALLOC_HEAP_SIZE (16 * 1024)
     static UCHAR malloc_heap_memory[MALLOC_HEAP_SIZE];
 
-    /*
-     * Create the default heap memory pool for malloc() to use.
-     */
-    status = tx_byte_pool_create(&DefaultHeap,
-                                 "Default Heap",
-                                 malloc_heap_memory,
-                                 MALLOC_HEAP_SIZE);
+    status = tx_byte_pool_create(&DefaultHeap, "Default Heap",
+                                 malloc_heap_memory, MALLOC_HEAP_SIZE);
 
-    /* If the heap fails, we can't continue. */
     if (status != TX_SUCCESS)
     {
+        print_string("ERROR: Failed to create ThreadX byte pool for malloc!\r\n");
         return;
     }
 
-/* --- Test Thread Objects --- */
-#define TEST_THREAD_STACK_SIZE 8192 // 8KB stack for safety
-    static TX_THREAD libc_test_thread;
-    static UCHAR libc_test_thread_stack[TEST_THREAD_STACK_SIZE];
-
-    /* Entry function for the test thread */
-    void libc_test_thread_entry(ULONG thread_input)
+    print_string("Enabling DCache from tx_application_define()...\r\n");
+    SCB_EnableDCache();
+    if ((SCB->CCR & SCB_CCR_DC_Msk) != 0)
     {
-        print_string("\r\nSUCCESS: Libc test thread has started.\r\n");
+        SCB_CleanDCache();
+        print_string("DCache enabled and cleaned successfully!\r\n");
+    }
 
-        // Wait a moment for ThreadX to fully stabilize
+/* --- Main Test Thread Objects --- */
+// Use the larger stack size required by the TFLM test.
+#define MAIN_TEST_THREAD_STACK_SIZE 8192
+    static TX_THREAD main_test_thread;
+    static UCHAR main_test_thread_stack[MAIN_TEST_THREAD_STACK_SIZE];
+
+    // This function will now run both tests sequentially.
+    void main_test_thread_entry(ULONG thread_input)
+    {
+        print_string("\r\nSUCCESS: Main test thread has started.\r\n");
         tx_thread_sleep(50);
 
-        // Re-enable DCache now that ThreadX is running
-        print_string("Re-enabling DCache from ThreadX task...\r\n");
-        SCB_EnableDCache();
-        print_string("DCache re-enabled successfully!\r\n");
-
-        // Now run the libc tests with DCache enabled
+        // 1. Run Libc tests
         run_libc_tests();
 
-        /* Loop forever after tests are done */
+        // 2. Run TFLM Hello World test
+        print_string("\r\nSUCCESS: Starting TFLM Hello World test.\r\n");
+        run_tflm_hello_world_test();
+        print_string("\r\nSUCCESS: TFLM Hello World test completed.\r\n");
+
+        // All tests are done, enter an infinite loop.
         while (1)
         {
-            tx_thread_sleep(500);
+            tx_thread_sleep(1000);
         }
     }
 
-    /* Create the thread that will run our libc tests */
-    status = tx_thread_create(&libc_test_thread,
-                              "LibC Test Thread",
-                              libc_test_thread_entry,
-                              0, // No input value
-                              libc_test_thread_stack,
-                              TEST_THREAD_STACK_SIZE,
-                              15, // Priority
-                              15, // Preemption-Threshold
-                              TX_NO_TIME_SLICE,
-                              TX_AUTO_START); // Start the thread automatically
+    // Create a single thread to run all tests.
+    status = tx_thread_create(&main_test_thread, "Main Test Thread", main_test_thread_entry,
+                              0, main_test_thread_stack, MAIN_TEST_THREAD_STACK_SIZE,
+                              15, 15, TX_NO_TIME_SLICE, TX_AUTO_START);
+
+    if (status != TX_SUCCESS)
+    {
+        print_string("ERROR: Failed to create Main Test Thread!\r\n");
+    }
+
+    /* --- The TFLM Hello World thread has been removed as it is no longer needed. --- */
 }

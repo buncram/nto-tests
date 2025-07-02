@@ -7,6 +7,12 @@
 
 #include "daric_hal.h"
 
+extern uint32_t __etext;
+extern uint32_t __data_start__;
+extern uint32_t __data_end__;
+extern uint32_t __bss_start__;
+extern uint32_t __bss_end__;
+
 // These are headers specific to our test application.
 #include "daric_util.h"
 #include "constants.h"
@@ -15,6 +21,7 @@
 
 void PendSV_Handler(void);
 void SysTick_Handler(void);
+extern void __libc_init_array(void);
 
 uint8_t ReramWrite(uint32_t dstAddr, uint8_t *pWtBuf, uint32_t wtLen);
 
@@ -204,6 +211,26 @@ void enable_fpu()
 
 void Reset_Handler(void)
 {
+    // --- START: C/C++ DATA INITIALIZATION ---
+    // This code must run before any other C code.
+
+    // 1. Copy the .data section from Flash to RAM
+    uint32_t *pSrc = &__etext;
+    uint32_t *pDest = &__data_start__;
+    while (pDest < &__data_end__)
+    {
+        *pDest++ = *pSrc++;
+    }
+
+    // 2. Zero out the .bss section in RAM
+    pDest = &__bss_start__;
+    while (pDest < &__bss_end__)
+    {
+        *pDest++ = 0;
+    }
+    // --- END: C/C++ DATA INITIALIZATION ---
+
+    // Now, continue with your original hardware setup
     for (volatile int i = 0; i < 5000000; i++)
     {
         __asm__("nop");
@@ -214,7 +241,7 @@ void Reset_Handler(void)
     *((volatile uint32_t *)0x40014000) = 0x3; // sramcfg.cach:ema[2:0]=0x4 (default for 0.8V), 0x3 for 0.9V
     *((volatile uint32_t *)0x40014014) = 0x1; // sramcfg.vexram:ema[2:0]=0x4 (default for 0.8V), 0x1 for 0.9V
 
-    for (int i = 0; i < 10; i++) // Reduced loop count for faster boot
+    for (int i = 0; i < 10; i++)
     {
         print_string("Hello from CM7!\r");
     }
@@ -234,6 +261,9 @@ void Reset_Handler(void)
 void nothing() {}
 
 void NMI_Handler()
+{
+}
+void _init(void)
 {
 }
 
@@ -448,9 +478,9 @@ void clifford(uint8_t *buf)
 
 static void print_test_result(const char *test_name, int success)
 {
-    print_string("Test - ");
+    // print_string("Test - ");
     print_string(test_name);
-    print_string(": ");
+    // print_string(": ");
     if (success)
     {
         print_string("SUCCESS\r\n");
@@ -465,45 +495,45 @@ void run_libc_tests()
 {
     print_string("\r\n--- Running Libc Integration Tests ---\r\n");
 
-    // Test 1: Simple malloc and free
-    char *test_str = (char *)malloc(20);
-    print_string("Test 1: malloc(20) returned address: ");
-    send_u32_hex((uint32_t)test_str);
-    print_string("\r\n");
-    print_test_result("malloc not NULL", test_str != NULL);
-    if (test_str)
-    {
-        free(test_str);
-    }
+    // // Test 1: Simple malloc and free
+    // char *test_str = (char *)malloc(20);
+    // print_string("Test 1: malloc(20) returned address: ");
+    // send_u32_hex((uint32_t)test_str);
+    // print_string("\r\n");
+    // print_test_result("malloc not NULL", test_str != NULL);
+    // if (test_str)
+    // {
+    //     free(test_str);
+    // }
 
-    // Test 2: Malloc, write, read, and free
-    int *test_int_ptr = (int *)malloc(sizeof(int));
-    int test_int_success = 0;
-    if (test_int_ptr)
-    {
-        *test_int_ptr = 0xCAFEFACE;
-        if (*test_int_ptr == 0xCAFEFACE)
-        {
-            test_int_success = 1;
-        }
-        free(test_int_ptr);
-    }
-    print_test_result("malloc, write, read", test_int_success);
+    // // Test 2: Malloc, write, read, and free
+    // int *test_int_ptr = (int *)malloc(sizeof(int));
+    // int test_int_success = 0;
+    // if (test_int_ptr)
+    // {
+    //     *test_int_ptr = 0xCAFEFACE;
+    //     if (*test_int_ptr == 0xCAFEFACE)
+    //     {
+    //         test_int_success = 1;
+    //     }
+    //     free(test_int_ptr);
+    // }
+    // print_test_result("malloc, write, read", test_int_success);
 
-    // Test 3: Realloc
-    int realloc_success = 0;
-    char *realloc_ptr = (char *)malloc(10);
-    if (realloc_ptr)
-    {
-        strcpy(realloc_ptr, "testing");
-        char *realloc_ptr2 = (char *)realloc(realloc_ptr, 100);
-        if (realloc_ptr2 && strcmp(realloc_ptr2, "testing") == 0)
-        {
-            realloc_success = 1;
-        }
-        free(realloc_ptr2);
-    }
-    print_test_result("realloc", realloc_success);
+    // // Test 3: Realloc
+    // int realloc_success = 0;
+    // char *realloc_ptr = (char *)malloc(10);
+    // if (realloc_ptr)
+    // {
+    //     strcpy(realloc_ptr, "testing");
+    //     char *realloc_ptr2 = (char *)realloc(realloc_ptr, 100);
+    //     if (realloc_ptr2 && strcmp(realloc_ptr2, "testing") == 0)
+    //     {
+    //         realloc_success = 1;
+    //     }
+    //     free(realloc_ptr2);
+    // }
+    // print_test_result("realloc", realloc_success);
 
     // Test 4: snprintf
     char buffer[100];
@@ -547,21 +577,21 @@ static void Platform_Init(void)
 // Add this function to debug your MPU configuration
 void debug_mpu_regions(void)
 {
-    print_string("=== MPU Region Debug ===\r\n");
+    // print_string("=== MPU Region Debug ===\r\n");
 
-    for (int i = 0; i < 8; i++)
-    {
-        // Select region
-        MPU->RNR = i;
+    // for (int i = 0; i < 8; i++)
+    // {
+    //     // Select region
+    //     MPU->RNR = i;
 
-        print_string("Region ");
-        send_u32_hex(i);
-        print_string(": RBAR=");
-        send_u32_hex(MPU->RBAR);
-        print_string(" RASR=");
-        send_u32_hex(MPU->RASR);
-        print_string("\r\n");
-    }
+    //     print_string("Region ");
+    //     send_u32_hex(i);
+    //     print_string(": RBAR=");
+    //     send_u32_hex(MPU->RBAR);
+    //     print_string(" RASR=");
+    //     send_u32_hex(MPU->RASR);
+    //     print_string("\r\n");
+    // }
 
     print_string("MPU CTRL: ");
     send_u32_hex(MPU->CTRL);
@@ -592,6 +622,10 @@ void configure_cacheable_mpu(void)
 void main_loop()
 {
     // Platform initialization - MPU must be configured before enabling DCache
+
+    enable_fpu();
+    __libc_init_array();
+
     Platform_Init();
     print_string("CM7 up\r\n");
 

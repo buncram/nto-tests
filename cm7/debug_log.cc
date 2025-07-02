@@ -1,67 +1,54 @@
-/* Copyright 2024 The TensorFlow Authors. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-==============================================================================*/
-
-#include "tensorflow/lite/micro/debug_log.h"
+#include "tensorflow/lite/micro/micro_log.h"
 
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 
-// Include your platform-specific headers
-#include "daric_util.h"
-#include "mbox.h"
+// Your platform-specific function for printing a string
+extern "C" void print_string(const char *s);
 
-extern "C" void DebugLog(const char *format, ...)
+// This is the implementation of the low-level logging function that TFLM
+// expects. It formats the string and prints it.
+// This function MUST have C linkage to be found by the TFLM library.
+extern "C" void VDebugLog(const char *format, va_list args)
 {
-    // Buffer for formatted string - adjust size as needed for your platform
+    // A buffer to hold the formatted string. 256 is a safe size.
     constexpr int kMaxLogLen = 256;
     char log_buffer[kMaxLogLen];
 
+    vsnprintf(log_buffer, kMaxLogLen, format, args);
+
+    // Ensure the buffer is null-terminated, even if truncated.
+    log_buffer[kMaxLogLen - 1] = '\0';
+
+    print_string(log_buffer);
+
+    // Add a newline if the formatted string didn't already have one.
+    if (strlen(log_buffer) > 0 && log_buffer[strlen(log_buffer) - 1] != '\n')
+    {
+        print_string("\r\n");
+    }
+}
+
+// The TFLM library calls these C-linkage functions when it needs to log.
+// We will implement them to call our core VDebugLog function.
+extern "C" void DebugLog(const char *format, ...)
+{
     va_list args;
     va_start(args, format);
-
-    // Use vsnprintf to format the string safely
-    int chars_written = vsnprintf(log_buffer, kMaxLogLen, format, args);
+    VDebugLog(format, args);
     va_end(args);
-
-    // Ensure null termination
-    if (chars_written >= kMaxLogLen)
-    {
-        log_buffer[kMaxLogLen - 1] = '\0';
-        chars_written = kMaxLogLen - 1;
-    }
-
-    // Output the formatted string using your platform's UART function
-    // Based on your code, you have __uart_putchar available
-    for (int i = 0; i < chars_written && log_buffer[i] != '\0'; ++i)
-    {
-        __uart_putchar(log_buffer[i]);
-    }
-
-    // Add newline if not present
-    if (chars_written > 0 && log_buffer[chars_written - 1] != '\n')
-    {
-        __uart_putchar('\n');
-    }
 }
 
-// Alternative implementation using your existing print_string function
-// You can use this instead if you prefer simpler logging without formatting
-/*
-extern "C" void DebugLog(const char* format, ...) {
-  // For simpler implementation, just output the format string
-  // This loses printf-style formatting but is more lightweight
-  print_string(format);
+extern "C" void VMicroPrintf(const char *format, va_list args)
+{
+    VDebugLog(format, args);
 }
-*/
+
+extern "C" void MicroPrintf(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    VDebugLog(format, args);
+    va_end(args);
+}

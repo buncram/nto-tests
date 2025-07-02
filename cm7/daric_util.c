@@ -34,7 +34,7 @@ uint32_t volatile systick24 = 0;
 
 #if 0
 //__STATIC_INLINE
-void printString(const char *s){
+void print_string(const char *s){
     char c;
     size_t i = 0;
     while ((c = s[i++]) != 0){
@@ -118,9 +118,9 @@ void HardFault_Handler(void)
     stack[6] = *(uint32_t *)((t0 + 40) & 0xfffffffcul);
     stack[7] = *(uint32_t *)((t0 + 44) & 0xfffffffcul);
 
-    printString("\nSP @:");
+    print_string("\nSP @:");
     sendU32Hex(t0);
-    printString("\nSatck new<->old:");
+    print_string("\nSatck new<->old:");
     sendU32Hex(stack[0]);
     sendU32Hex(stack[1]);
     sendU32Hex(stack[2]);
@@ -130,36 +130,36 @@ void HardFault_Handler(void)
     sendU32Hex(stack[6]);
     sendU32Hex(stack[7]);
 
-    printString("\n\nHardFault!!!\n");
-    printString("systick: ");
+    print_string("\n\nHardFault!!!\n");
+    print_string("systick: ");
     sendU32Hex(SysTick->VAL);
 
     t0 = SCB->CFSR;
-    printString("\nCFSR");
+    print_string("\nCFSR");
     sendU32Hex(SCB->CFSR);
-    printString("\n");
+    print_string("\n");
     for (b = 0; b < 32; b++)
     {
         if (0 != (t0 & (1UL << b)))
         {
-            printString(CFSRERRS[b]);
+            print_string(CFSRERRS[b]);
         }
     }
-    printString("\nHFSR");
+    print_string("\nHFSR");
     sendU32Hex(SCB->HFSR);
-    printString("\nDFSR");
+    print_string("\nDFSR");
     sendU32Hex(SCB->DFSR);
-    printString("\nMMFAR");
+    print_string("\nMMFAR");
     sendU32Hex(SCB->MMFAR);
-    printString("\nBFAR");
+    print_string("\nBFAR");
     sendU32Hex(SCB->BFAR);
-    printString("\nAFSR");
+    print_string("\nAFSR");
     sendU32Hex(SCB->AFSR);
-    printString("\nABFSR");
+    print_string("\nABFSR");
     sendU32Hex(SCB->ABFSR);
     // *((volatile uint8_t* )0x4004f0ff) = 0x55; // simDone
 
-    printString("\n\nHardFault. Halted here!!!\n");
+    print_string("\n\nHardFault. Halted here!!!\n");
 
     while (1)
     {
@@ -219,7 +219,7 @@ void setupTicks(void)
 
 // void SysTick_Handler(void){
 //     systick24++;
-//     //printString("\nSysTick\n");
+//     //print_string("\nSysTick\n");
 // }
 
 /*
