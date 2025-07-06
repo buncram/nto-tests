@@ -1,6 +1,7 @@
 #include "tx_api.h"
 #include "mbox.h"
 #include "daric_hal.h"
+#include "tflm_hello_world_wrapper.h"
 
 // Declare the C-linkage function from the TFLM wrapper
 extern void run_tflm_hello_world_test(void);

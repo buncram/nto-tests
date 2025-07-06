@@ -10,7 +10,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-__ROM_BASE = 0x60300000;
+__ROM_BASE = 0x60302000;
 __ROM_SIZE = 0x00080000;
 
 __RAM_BASE = 0x20000000;

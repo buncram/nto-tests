@@ -142,7 +142,7 @@ C_SRCS := \
 CXX_SRCS := \
 	$(PROJECT_CXX_SRCS) \
 	$(TFLM_CORE_SRCS_CXX) \
-    $(HELLO_WORLD_SRCS_CXX) \
+    # $(HELLO_WORLD_SRCS_CXX) \
 	# $(PERSON_DETECTION_SRCS_CXX) \
 	# $(SIGNAL_SRCS_CXX) \
 	# $(MICRO_SPEECH_TEST_SRCS_CXX)
@@ -334,9 +334,9 @@ $(TARGET).elf: $(OBJS)
 
 # Rule for creating the .bin file
 %.bin: %.elf
-	@echo "OBJCOPY $@"
-	@$(OBJCOPY) $(CPFLAGS) $^ $@
-	@$(OBJDUMP) $(ODFLAGS) $^ > $(@:.bin=.dmp)
+	echo "OBJCOPY $@"
+	$(OBJCOPY) $(CPFLAGS) $^ $@
+	$(OBJDUMP) $(ODFLAGS) $^ > $(@:.bin=.dmp)
 
 clean:
 	@echo "Cleaning..."

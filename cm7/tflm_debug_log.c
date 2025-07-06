@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include "debug_log.h"
 #include <string.h>
 
 // Your platform's function to print a string

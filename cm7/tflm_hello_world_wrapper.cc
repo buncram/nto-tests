@@ -6,21 +6,84 @@
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "examples/hello_world/models/hello_world_float_model_data.h"
 
+#include "tflm_hello_world_wrapper.h"
+#include "debug_log.h" // Your new header
+
 #include <cmath>
 
-// Bring in the C headers for your project's HAL and utility functions
-#include "daric_hal.h"
-#include "daric_util.h"
-#include "mbox.h"
+namespace
+{
+    const int kTensorArenaSize = 4 * 1024;
+    alignas(16) uint8_t tensor_arena[kTensorArenaSize];
+} // namespace
+
+extern "C"
+{
+    void print_string(const char *s);
+    void send_u32_hex(uint32_t x);
+}
+
+void run_direct_print_test()
+{
+    print_string("\r\n--- Direct C Function Print Test ---\r\n");
+
+    // 1. Test integer argument passing
+    int my_int = 12345; // Hex value is 0x3039
+    print_string("Testing integer 12345 (should be 00003039): ");
+    send_u32_hex(my_int);
+    print_string("\r\n");
+
+    // 2. Test float memory access by printing its raw bits
+    float my_float = 3.14f; // IEEE 754 hex is 0x4048F5C3
+    // Use a pointer cast to get the raw 32-bit integer representation of the float
+    uint32_t float_as_int = *reinterpret_cast<uint32_t *>(&my_float);
+    print_string("Testing float 3.14 (bits should be 4048F5C3): ");
+    send_u32_hex(float_as_int);
+    print_string("\r\n");
+
+    print_string("--- Direct Print Test Complete ---\r\n\r\n");
+}
+
+void run_cpp_memory_test(tflite::ErrorReporter *error_reporter)
+{
+    TF_LITE_REPORT_ERROR(error_reporter, "--- C++ Memory Test ---");
+
+    // Test local variables
+    int my_int = 0;
+    float my_float = 3.14f;
+    TF_LITE_REPORT_ERROR(error_reporter, "Local int: %d, Local float: %f", my_int, static_cast<double>(my_float));
+
+    // Test writing to and reading from an array on the stack
+    float test_array[4];
+    test_array[0] = 1.1f;
+    test_array[1] = 2.2f;
+    test_array[2] = -9.87f;
+
+    if (test_array[1] == 2.2f)
+    {
+        TF_LITE_REPORT_ERROR(error_reporter, "Array read/write SUCCESS. Values: %f, %f, %f",
+                             static_cast<double>(test_array[0]),
+                             static_cast<double>(test_array[1]),
+                             static_cast<double>(test_array[2]));
+    }
+    else
+    {
+        TF_LITE_REPORT_ERROR(error_reporter, "Array read/write FAILURE.");
+    }
+    TF_LITE_REPORT_ERROR(error_reporter, "--- C++ Memory Test Complete ---");
+}
 
 extern "C" void run_tflm_hello_world_test(void)
 {
-    print_string("Entered TFLM C++ wrapper function.\r\n");
-
-    // 1. Set up logging
+    // Use the standard error reporter. It will automatically find your DebugLog function.
     tflite::MicroErrorReporter micro_error_reporter;
     tflite::ErrorReporter *error_reporter = &micro_error_reporter;
-    TF_LITE_REPORT_ERROR(error_reporter, "TFLM: 1. Logging ready.");
+
+    run_direct_print_test();
+
+    TF_LITE_REPORT_ERROR(error_reporter, "--- TFLM Hello World Test ---");
+
+    run_cpp_memory_test(error_reporter);
 
     // 2. Set up any platform-specific initializations
     tflite::InitializeTarget();
@@ -42,14 +105,7 @@ extern "C" void run_tflm_hello_world_test(void)
         TF_LITE_REPORT_ERROR(error_reporter, "Failed to add FullyConnected op.");
         return;
     }
-    TF_LITE_REPORT_ERROR(error_reporter, "TFLM: 4. Op resolver created.");
 
-    // 5. Define the Tensor Arena
-    const int kTensorArenaSize = 4 * 1024;
-    uint8_t tensor_arena[kTensorArenaSize];
-    TF_LITE_REPORT_ERROR(error_reporter, "TFLM: 5. Tensor arena defined on stack.");
-
-    // 6. Create the MicroAllocator
     tflite::MicroAllocator *allocator = tflite::MicroAllocator::Create(tensor_arena, kTensorArenaSize);
     if (allocator == nullptr)
     {
@@ -77,12 +133,9 @@ extern "C" void run_tflm_hello_world_test(void)
 
     TF_LITE_REPORT_ERROR(error_reporter, "Starting inference...");
 
-    float x_test[] = {0.0f, 1.0f, 1.570796f, 3.14159f, 4.7123889f, 6.283185f};
-    int num_tests = sizeof(x_test) / sizeof(float);
-
-    for (int i = 0; i < num_tests; ++i)
+    float x_test[] = {0.0f, 1.0f, 1.570796f, 3.14159f}; // Shortened for brevity
+    for (float x_val : x_test)
     {
-        float x_val = x_test[i];
         input->data.f[0] = x_val;
 
         if (interpreter.Invoke() != kTfLiteOk)
@@ -92,9 +145,10 @@ extern "C" void run_tflm_hello_world_test(void)
         }
 
         float y_val = output->data.f[0];
-        TF_LITE_REPORT_ERROR(error_reporter, "x_val: %f, inferred y_val: %f, actual y_val: %f",
+        TF_LITE_REPORT_ERROR(error_reporter, "x_val: %.4f, inferred y: %.4f, actual y: %.4f",
                              static_cast<double>(x_val),
                              static_cast<double>(y_val),
                              static_cast<double>(sin(x_val)));
     }
+    TF_LITE_REPORT_ERROR(error_reporter, "--- Test Complete ---");
 }
