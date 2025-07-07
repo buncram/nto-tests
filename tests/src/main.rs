@@ -18,6 +18,7 @@ use utralib::generated::*;
 
 mod aes;
 mod bio;
+mod sam_bio;
 mod cam;
 mod debug;
 mod gpio;
@@ -258,6 +259,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut aes_tests = aes::AesTests::new(cfg!(feature = "aes-tests"));
     let mut reset_value_test = utils::ResetValue::new(cfg!(feature = "reset-value-tests"));
     let mut bio_tests = bio::BioTests::new(cfg!(feature = "bio-tests"));
+    let mut bio_tests_sam = sam_bio::BioTestsSam::new(true);
     let mut gpio_tests = gpio::GpioTests::new(cfg!(feature = "gpio-tests"));
     let mut satp_setup = satp::SatpSetup::new(cfg!(feature = "satp-tests"));
     let mut irq_setup = irqs::IrqSetup::new(cfg!(feature = "irq-tests"));
@@ -286,7 +288,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(cfg!(feature = "pl230-tests"));
 
-    let mut tests: [&mut dyn Test; 22] = [
+    let mut tests: [&mut dyn Test; 23] = [
         &mut reset_value_test,
         // stuff to run first
         &mut cam_tests,
@@ -296,6 +298,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
         // quick tests
         &mut aes_tests,
         &mut bio_tests,
+        &mut bio_tests_sam,
         // tests that can only be run on the full chip
         &mut mbox_test,
         &mut udma_tests,
