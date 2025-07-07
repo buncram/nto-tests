@@ -95,7 +95,7 @@ PROJECT_CXX_SRCS := \
     tflm_platform_utils.cc \
     dso_handle.cc \
     tflm_hello_world_wrapper.cc \
-    #debug_log.cc
+    # debug_log.cc
 
 # --- Automatically find all source files in those directories ---
 THREADX_COMMON_SRCS_C := $(wildcard $(THREADX_COMMON_PATH)/*.c)
