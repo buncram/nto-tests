@@ -4,7 +4,7 @@
 
 // Declare the C-linkage function from the TFLM wrapper
 extern void run_tflm_hello_world_test(void);
-// extern void run_tflm_person_detection_test(void);
+extern void run_tflm_person_detection_test(void);
 
 /*
  * This is the memory pool that our custom malloc() in libc-hooks.c
@@ -63,7 +63,7 @@ void tx_application_define(void *first_unused_memory)
 
         // Run the Person Detection test
         print_string("\r\nSUCCESS: Starting TFLM Person Detection test.\r\n");
-        // run_tflm_person_detection_test();
+        run_tflm_person_detection_test();
         print_string("\r\nSUCCESS: TFLM Person Detection test completed.\r\n");
 
         // All tests are done, enter an infinite loop.
