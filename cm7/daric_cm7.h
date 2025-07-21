@@ -9,235 +9,235 @@
 
 typedef enum IRQn
 {
-    /******  Cortex M7 Processor Exceptions Numbers **************************************************/
-    NonMaskableInt_IRQn        = -14,    /*!< -14 Non Maskable Interrupt                              */
-    HardFault_IRQn             = -13,    /*!< -13 Cortex M7 Hard Fault Interrupt                     */
-    MemoryManagement_IRQn      = -12,    /*!< -12  Memory Management, MPU mismatch, including Access Violation and No Match   */
-    BusFault_IRQn              = -11,    /*!< -11  Bus Fault, Pre-Fetch-, Memory Access Fault, other address/memory related Fault */
-    UsageFault_IRQn            = -10,     /*!< -10  Usage Fault, i.e. Undef Instruction, Illegal State Transition  */
-    SVCall_IRQn                = -5,     /*!< 11 Cortex M7 SV Call Interrupt                       */
-    DebugMonitor_IRQn          = -4,      /*!< -4 Debug Monitor                                                          */
-    PendSV_IRQn                = -2,      /*!< -2 Pendable request for system service                                    */
-    SysTick_IRQn               = -1,      /*!< -1 System Tick Timer  */
+     /******  Cortex M7 Processor Exceptions Numbers **************************************************/
+     NonMaskableInt_IRQn = -14,   /*!< -14 Non Maskable Interrupt                              */
+     HardFault_IRQn = -13,        /*!< -13 Cortex M7 Hard Fault Interrupt                     */
+     MemoryManagement_IRQn = -12, /*!< -12  Memory Management, MPU mismatch, including Access Violation and No Match   */
+     BusFault_IRQn = -11,         /*!< -11  Bus Fault, Pre-Fetch-, Memory Access Fault, other address/memory related Fault */
+     UsageFault_IRQn = -10,       /*!< -10  Usage Fault, i.e. Undef Instruction, Illegal State Transition  */
+     SVCall_IRQn = -5,            /*!< 11 Cortex M7 SV Call Interrupt                       */
+     DebugMonitor_IRQn = -4,      /*!< -4 Debug Monitor                                                          */
+     PendSV_IRQn = -2,            /*!< -2 Pendable request for system service                                    */
+     SysTick_IRQn = -1,           /*!< -1 System Tick Timer  */
 
-    /******  Daric Cortex M7 specific Interrupt Numbers ******************************************/
-    //sce
-    //SCE_IRQ00_IRQn             = 32 + 16,
-    //SCE_IRQ01_IRQn             = 33 + 16,
-    //SCE_IRQ02_IRQn             = 34 + 16,
-    //SCE_IRQ03_IRQn             = 35 + 16,
-    //SCE_IRQ04_IRQn             = 36 + 16,
-    //SCE_IRQ05_IRQn             = 37 + 16,
-    //SCE_IRQ06_IRQn             = 38 + 16,
-    //SCE_IRQ07_IRQn             = 39 + 16,
-    //SCE_IRQ08_IRQn             = 40 + 16,
-    //SCE_IRQ09_IRQn             = 41 + 16,
-    //SCE_IRQ10_IRQn             = 42 + 16,
-    //SCE_IRQ11_IRQn             = 43 + 16,
-    //SCE_IRQ12_IRQn             = 44 + 16,
-    //SCE_IRQ13_IRQn             = 45 + 16,
-    //SCE_IRQ14_IRQn             = 46 + 16,
-    //SCE_IRQ15_IRQn             = 47 + 16,
-    //SCE_IRQ16_IRQn             = 48 + 16,
-    //SCE_IRQ17_IRQn             = 49 + 16,
-    //SCE_IRQ18_IRQn             = 50 + 16,
-    //SCE_IRQ19_IRQn             = 51 + 16,
-    //SCE_IRQ20_IRQn             = 52 + 16,
-    //SCE_IRQ21_IRQn             = 53 + 16,
-    //SCE_IRQ22_IRQn             = 54 + 16,
-    //SCE_IRQ23_IRQn             = 55 + 16,
-    //SCE_IRQ24_IRQn             = 56 + 16,
-    //SCE_IRQ25_IRQn             = 57 + 16,
-    //SCE_IRQ26_IRQn             = 58 + 16,
-    //SCE_IRQ27_IRQn             = 59 + 16,
-    //SCE_IRQ28_IRQn             = 60 + 16,
-    //SCE_IRQ29_IRQn             = 61 + 16,
-    //SCE_IRQ30_IRQn             = 62 + 16,
-    //SCE_IRQ31_IRQn             = 63 + 16,
+     /******  Daric Cortex M7 specific Interrupt Numbers ******************************************/
+     // sce
+     // SCE_IRQ00_IRQn             = 32 + 16,
+     // SCE_IRQ01_IRQn             = 33 + 16,
+     // SCE_IRQ02_IRQn             = 34 + 16,
+     // SCE_IRQ03_IRQn             = 35 + 16,
+     // SCE_IRQ04_IRQn             = 36 + 16,
+     // SCE_IRQ05_IRQn             = 37 + 16,
+     // SCE_IRQ06_IRQn             = 38 + 16,
+     // SCE_IRQ07_IRQn             = 39 + 16,
+     // SCE_IRQ08_IRQn             = 40 + 16,
+     // SCE_IRQ09_IRQn             = 41 + 16,
+     // SCE_IRQ10_IRQn             = 42 + 16,
+     // SCE_IRQ11_IRQn             = 43 + 16,
+     // SCE_IRQ12_IRQn             = 44 + 16,
+     // SCE_IRQ13_IRQn             = 45 + 16,
+     // SCE_IRQ14_IRQn             = 46 + 16,
+     // SCE_IRQ15_IRQn             = 47 + 16,
+     // SCE_IRQ16_IRQn             = 48 + 16,
+     // SCE_IRQ17_IRQn             = 49 + 16,
+     // SCE_IRQ18_IRQn             = 50 + 16,
+     // SCE_IRQ19_IRQn             = 51 + 16,
+     // SCE_IRQ20_IRQn             = 52 + 16,
+     // SCE_IRQ21_IRQn             = 53 + 16,
+     // SCE_IRQ22_IRQn             = 54 + 16,
+     // SCE_IRQ23_IRQn             = 55 + 16,
+     // SCE_IRQ24_IRQn             = 56 + 16,
+     // SCE_IRQ25_IRQn             = 57 + 16,
+     // SCE_IRQ26_IRQn             = 58 + 16,
+     // SCE_IRQ27_IRQn             = 59 + 16,
+     // SCE_IRQ28_IRQn             = 60 + 16,
+     // SCE_IRQ29_IRQn             = 61 + 16,
+     // SCE_IRQ30_IRQn             = 62 + 16,
+     // SCE_IRQ31_IRQn             = 63 + 16,
 
-    /* udma peripherals */
+     /* udma peripherals */
 
-    //uarts
-    UART0_IRQ_RX_IRQn           = 64 + 16,
-    UART0_IRQ_TX_IRQn           = 65 + 16,
-    UART0_IRQ_POLL_IRQn         = 66 + 16,
-    UART0_IRQ_EOT_IRQn          = 67 + 16,
-    UART1_IRQ_RX_IRQn           = 68 + 16,
-    UART1_IRQ_TX_IRQn           = 69 + 16,
-    UART1_IRQ_POLL_IRQn         = 70 + 16,
-    UART1_IRQ_EOT_IRQn          = 71 + 16,
-    UART2_IRQ_RX_IRQn           = 72 + 16,
-    UART2_IRQ_TX_IRQn           = 73 + 16,
-    UART2_IRQ_POLL_IRQn         = 74 + 16,
-    UART2_IRQ_EOT_IRQn          = 75 + 16,
-    UART3_IRQ_RX_IRQn           = 76 + 16,
-    UART3_IRQ_TX_IRQn           = 77 + 16,
-    UART3_IRQ_POLL_IRQn         = 78 + 16,
-    UART3_IRQ_EOT_IRQn          = 79 + 16,
+     // uarts
+     UART0_IRQ_RX_IRQn = 64 + 16,
+     UART0_IRQ_TX_IRQn = 65 + 16,
+     UART0_IRQ_POLL_IRQn = 66 + 16,
+     UART0_IRQ_EOT_IRQn = 67 + 16,
+     UART1_IRQ_RX_IRQn = 68 + 16,
+     UART1_IRQ_TX_IRQn = 69 + 16,
+     UART1_IRQ_POLL_IRQn = 70 + 16,
+     UART1_IRQ_EOT_IRQn = 71 + 16,
+     UART2_IRQ_RX_IRQn = 72 + 16,
+     UART2_IRQ_TX_IRQn = 73 + 16,
+     UART2_IRQ_POLL_IRQn = 74 + 16,
+     UART2_IRQ_EOT_IRQn = 75 + 16,
+     UART3_IRQ_RX_IRQn = 76 + 16,
+     UART3_IRQ_TX_IRQn = 77 + 16,
+     UART3_IRQ_POLL_IRQn = 78 + 16,
+     UART3_IRQ_EOT_IRQn = 79 + 16,
 
-    //spims
-    SPIM0_IRQ_RX_IRQn           = 80 + 16,
-    SPIM0_IRQ_TX_IRQn           = 81 + 16,
-    SPIM0_IRQ_POLL_IRQn         = 82 + 16,
-    SPIM0_IRQ_EOT_IRQn          = 83 + 16,
-    SPIM1_IRQ_RX_IRQn           = 84 + 16,
-    SPIM1_IRQ_TX_IRQn           = 85 + 16,
-    SPIM1_IRQ_POLL_IRQn         = 86 + 16,
-    SPIM1_IRQ_EOT_IRQn          = 87 + 16,
-    SPIM2_IRQ_RX_IRQn           = 88 + 16,
-    SPIM2_IRQ_TX_IRQn           = 89 + 16,
-    SPIM2_IRQ_POLL_IRQn         = 90 + 16,
-    SPIM2_IRQ_EOT_IRQn          = 91 + 16,
-    SPIM3_IRQ_RX_IRQn           = 92 + 16,
-    SPIM3_IRQ_TX_IRQn           = 93 + 16,
-    SPIM3_IRQ_POLL_IRQn         = 94 + 16,
-    SPIM3_IRQ_EOT_IRQn          = 95 + 16,
+     // spims
+     SPIM0_IRQ_RX_IRQn = 80 + 16,
+     SPIM0_IRQ_TX_IRQn = 81 + 16,
+     SPIM0_IRQ_POLL_IRQn = 82 + 16,
+     SPIM0_IRQ_EOT_IRQn = 83 + 16,
+     SPIM1_IRQ_RX_IRQn = 84 + 16,
+     SPIM1_IRQ_TX_IRQn = 85 + 16,
+     SPIM1_IRQ_POLL_IRQn = 86 + 16,
+     SPIM1_IRQ_EOT_IRQn = 87 + 16,
+     SPIM2_IRQ_RX_IRQn = 88 + 16,
+     SPIM2_IRQ_TX_IRQn = 89 + 16,
+     SPIM2_IRQ_POLL_IRQn = 90 + 16,
+     SPIM2_IRQ_EOT_IRQn = 91 + 16,
+     SPIM3_IRQ_RX_IRQn = 92 + 16,
+     SPIM3_IRQ_TX_IRQn = 93 + 16,
+     SPIM3_IRQ_POLL_IRQn = 94 + 16,
+     SPIM3_IRQ_EOT_IRQn = 95 + 16,
 
-    //i2cs
-    I2C0_IRQ_RX_IRQn            = 96 + 16,
-    I2C0_IRQ_TX_IRQn            = 97 + 16,
-    //I2C0_IRQ2_IRQn            = 98 + 16,
-    //I2C0_IRQ3_IRQn            = 99 + 16,
-    I2C1_IRQ_RX_IRQn            = 100 + 16,
-    I2C1_IRQ_TX_IRQn            = 101 + 16,
-    //I2C1_IRQ2_IRQn            = 102 + 16,
-    //I2C1_IRQ3_IRQn            = 103 + 16,
-    I2C2_IRQ_RX_IRQn            = 104 + 16,
-    I2C2_IRQ_TX_IRQn            = 105 + 16,
-    //I2C2_IRQ2_IRQn            = 106 + 16,
-    //I2C2_IRQ3_IRQn            = 107 + 16,
-    I2C3_IRQ_RX_IRQn            = 108 + 16,
-    I2C3_IRQ_TX_IRQn            = 109 + 16,
-    //I2C3_IRQ2_IRQn            = 110 + 16,
-    //I2C3_IRQ3_IRQn            = 111 + 16,
+     // i2cs
+     I2C0_IRQ_RX_IRQn = 96 + 16,
+     I2C0_IRQ_TX_IRQn = 97 + 16,
+     // I2C0_IRQ2_IRQn            = 98 + 16,
+     // I2C0_IRQ3_IRQn            = 99 + 16,
+     I2C1_IRQ_RX_IRQn = 100 + 16,
+     I2C1_IRQ_TX_IRQn = 101 + 16,
+     // I2C1_IRQ2_IRQn            = 102 + 16,
+     // I2C1_IRQ3_IRQn            = 103 + 16,
+     I2C2_IRQ_RX_IRQn = 104 + 16,
+     I2C2_IRQ_TX_IRQn = 105 + 16,
+     // I2C2_IRQ2_IRQn            = 106 + 16,
+     // I2C2_IRQ3_IRQn            = 107 + 16,
+     I2C3_IRQ_RX_IRQn = 108 + 16,
+     I2C3_IRQ_TX_IRQn = 109 + 16,
+     // I2C3_IRQ2_IRQn            = 110 + 16,
+     // I2C3_IRQ3_IRQn            = 111 + 16,
 
-    //sdio
-    //SDIO_IRQ0_IRQn            = 112 + 16,
-    //SDIO_IRQ1_IRQn            = 113 + 16,
-    //SDIO_IRQ2_IRQn            = 114 + 16,
-    //SDIO_IRQ3_IRQn            = 115 + 16,
+     // sdio
+     // SDIO_IRQ0_IRQn            = 112 + 16,
+     // SDIO_IRQ1_IRQn            = 113 + 16,
+     // SDIO_IRQ2_IRQn            = 114 + 16,
+     // SDIO_IRQ3_IRQn            = 115 + 16,
 
-    //i2s
-    I2S_IRQ_RX_IRQn             = 116 + 16,
-    I2S_IRQ_TX_IRQn             = 117 + 16,
-    //I2S_IRQ2_IRQn             = 118 + 16,
-    //I2S_IRQ3_IRQn             = 119 + 16,
+     // i2s
+     I2S_IRQ_RX_IRQn = 116 + 16,
+     I2S_IRQ_TX_IRQn = 117 + 16,
+     // I2S_IRQ2_IRQn             = 118 + 16,
+     // I2S_IRQ3_IRQn             = 119 + 16,
 
-    //camif
-    //CAMIF_IRQ0_IRQn           = 120 + 16,
-    //CAMIF_IRQ1_IRQn           = 121 + 16,
-    //CAMIF_IRQ2_IRQn           = 122 + 16,
-    //CAMIF_IRQ3_IRQn           = 123 + 16,
+     // camif
+     // CAMIF_IRQ0_IRQn           = 120 + 16,
+     // CAMIF_IRQ1_IRQn           = 121 + 16,
+     // CAMIF_IRQ2_IRQn           = 122 + 16,
+     // CAMIF_IRQ3_IRQn           = 123 + 16,
 
-    //scif
-    //SCIF_IRQ0_IRQn            = 124 + 16,
-    //SCIF_IRQ1_IRQn            = 125 + 16,
-    //SCIF_IRQ2_IRQn            = 126 + 16,
-    //SCIF_IRQ3_IRQn            = 127 + 16,
+     // scif
+     // SCIF_IRQ0_IRQn            = 124 + 16,
+     // SCIF_IRQ1_IRQn            = 125 + 16,
+     // SCIF_IRQ2_IRQn            = 126 + 16,
+     // SCIF_IRQ3_IRQn            = 127 + 16,
 
-    //spi slave
-    //SPIS0_IRQ0_IRQn           = 128 + 16,
-    //SPIS0_IRQ1_IRQn           = 129 + 16,
-    //SPIS0_IRQ2_IRQn           = 130 + 16,
-    //SPIS0_IRQ3_IRQn           = 131 + 16,
-    //SPIS1_IRQ0_IRQn           = 132 + 16,
-    //SPIS1_IRQ1_IRQn           = 133 + 16,
-    //SPIS1_IRQ2_IRQn           = 134 + 16,
-    //SPIS1_IRQ3_IRQn           = 135 + 16,
+     // spi slave
+     // SPIS0_IRQ0_IRQn           = 128 + 16,
+     // SPIS0_IRQ1_IRQn           = 129 + 16,
+     // SPIS0_IRQ2_IRQn           = 130 + 16,
+     // SPIS0_IRQ3_IRQn           = 131 + 16,
+     // SPIS1_IRQ0_IRQn           = 132 + 16,
+     // SPIS1_IRQ1_IRQn           = 133 + 16,
+     // SPIS1_IRQ2_IRQn           = 134 + 16,
+     // SPIS1_IRQ3_IRQn           = 135 + 16,
 
-    //RESERVED_IRQn             = 136 + 16,
-    //RESERVED_IRQn             = 137 + 16,
-    //RESERVED_IRQn             = 138 + 16,
-    //RESERVED_IRQn             = 139 + 16,
-    //RESERVED_IRQn             = 140 + 16,
-    //RESERVED_IRQn             = 141 + 16,
-    //RESERVED_IRQn             = 142 + 16,
-    //RESERVED_IRQn             = 143 + 16,
+     // RESERVED_IRQn             = 136 + 16,
+     // RESERVED_IRQn             = 137 + 16,
+     // RESERVED_IRQn             = 138 + 16,
+     // RESERVED_IRQn             = 139 + 16,
+     // RESERVED_IRQn             = 140 + 16,
+     // RESERVED_IRQn             = 141 + 16,
+     // RESERVED_IRQn             = 142 + 16,
+     // RESERVED_IRQn             = 143 + 16,
 
-    //gpios
-    GPIO_IRQ0_IRQn            = 144 + 16
-    //GPIO_IRQ1_IRQn            = 145 + 16,
-    //GPIO_IRQ2_IRQn            = 146 + 16,
-    //GPIO_IRQ3_IRQn            = 147 + 16,
-    //GPIO_IRQ4_IRQn            = 148 + 16,
-    //GPIO_IRQ5_IRQn            = 149 + 16,
-    //GPIO_IRQ6_IRQn            = 150 + 16,
-    //GPIO_IRQ7_IRQn            = 151 + 16,
+     // gpios
+     GPIO_IRQ0_IRQn = 144 + 16
+     // GPIO_IRQ1_IRQn            = 145 + 16,
+     // GPIO_IRQ2_IRQn            = 146 + 16,
+     // GPIO_IRQ3_IRQn            = 147 + 16,
+     // GPIO_IRQ4_IRQn            = 148 + 16,
+     // GPIO_IRQ5_IRQn            = 149 + 16,
+     // GPIO_IRQ6_IRQn            = 150 + 16,
+     // GPIO_IRQ7_IRQn            = 151 + 16,
 
-    //RESERVED_IRQn             = 152 + 16,
-    //RESERVED_IRQn             = 153 + 16,
-    //RESERVED_IRQn             = 154 + 16,
-    //RESERVED_IRQn             = 155 + 16,
-    //RESERVED_IRQn             = 156 + 16,
-    //RESERVED_IRQn             = 157 + 16,
-    //RESERVED_IRQn             = 158 + 16,
-    //RESERVED_IRQn             = 159 + 16,
-    //RESERVED_IRQn             = 160 + 16,
-    //RESERVED_IRQn             = 161 + 16,
-    //RESERVED_IRQn             = 162 + 16,
-    //RESERVED_IRQn             = 163 + 16,
-    //RESERVED_IRQn             = 164 + 16,
-    //RESERVED_IRQn             = 165 + 16,
-    //RESERVED_IRQn             = 166 + 16,
-    //RESERVED_IRQn             = 167 + 16,
-    //RESERVED_IRQn             = 168 + 16,
-    //RESERVED_IRQn             = 169 + 16,
-    //RESERVED_IRQn             = 170 + 16,
-    //RESERVED_IRQn             = 171 + 16,
-    //RESERVED_IRQn             = 172 + 16,
-    //RESERVED_IRQn             = 173 + 16,
-    //RESERVED_IRQn             = 174 + 16,
-    //RESERVED_IRQn             = 175 + 16,
-    //RESERVED_IRQn             = 176 + 16,
-    //RESERVED_IRQn             = 177 + 16,
-    //RESERVED_IRQn             = 178 + 16,
-    //RESERVED_IRQn             = 179 + 16,
-    //RESERVED_IRQn             = 180 + 16,
-    //RESERVED_IRQn             = 181 + 16,
-    //RESERVED_IRQn             = 182 + 16,
-    //RESERVED_IRQn             = 183 + 16,
-    //RESERVED_IRQn             = 184 + 16,
-    //RESERVED_IRQn             = 185 + 16,
-    //RESERVED_IRQn             = 186 + 16,
-    //RESERVED_IRQn             = 187 + 16,
-    //RESERVED_IRQn             = 188 + 16,
-    //RESERVED_IRQn             = 189 + 16,
-    //RESERVED_IRQn             = 190 + 16,
-    //RESERVED_IRQn             = 191 + 16,
-    //RESERVED_IRQn             = 192 + 16,
+     // RESERVED_IRQn             = 152 + 16,
+     // RESERVED_IRQn             = 153 + 16,
+     // RESERVED_IRQn             = 154 + 16,
+     // RESERVED_IRQn             = 155 + 16,
+     // RESERVED_IRQn             = 156 + 16,
+     // RESERVED_IRQn             = 157 + 16,
+     // RESERVED_IRQn             = 158 + 16,
+     // RESERVED_IRQn             = 159 + 16,
+     // RESERVED_IRQn             = 160 + 16,
+     // RESERVED_IRQn             = 161 + 16,
+     // RESERVED_IRQn             = 162 + 16,
+     // RESERVED_IRQn             = 163 + 16,
+     // RESERVED_IRQn             = 164 + 16,
+     // RESERVED_IRQn             = 165 + 16,
+     // RESERVED_IRQn             = 166 + 16,
+     // RESERVED_IRQn             = 167 + 16,
+     // RESERVED_IRQn             = 168 + 16,
+     // RESERVED_IRQn             = 169 + 16,
+     // RESERVED_IRQn             = 170 + 16,
+     // RESERVED_IRQn             = 171 + 16,
+     // RESERVED_IRQn             = 172 + 16,
+     // RESERVED_IRQn             = 173 + 16,
+     // RESERVED_IRQn             = 174 + 16,
+     // RESERVED_IRQn             = 175 + 16,
+     // RESERVED_IRQn             = 176 + 16,
+     // RESERVED_IRQn             = 177 + 16,
+     // RESERVED_IRQn             = 178 + 16,
+     // RESERVED_IRQn             = 179 + 16,
+     // RESERVED_IRQn             = 180 + 16,
+     // RESERVED_IRQn             = 181 + 16,
+     // RESERVED_IRQn             = 182 + 16,
+     // RESERVED_IRQn             = 183 + 16,
+     // RESERVED_IRQn             = 184 + 16,
+     // RESERVED_IRQn             = 185 + 16,
+     // RESERVED_IRQn             = 186 + 16,
+     // RESERVED_IRQn             = 187 + 16,
+     // RESERVED_IRQn             = 188 + 16,
+     // RESERVED_IRQn             = 189 + 16,
+     // RESERVED_IRQn             = 190 + 16,
+     // RESERVED_IRQn             = 191 + 16,
+     // RESERVED_IRQn             = 192 + 16,
 
-    //Errors
-    //RESERVED_IRQn             = 193 + 16,
-    //RESERVED_IRQn             = 194 + 16,
-    //RESERVED_IRQn             = 195 + 16,
-    //RESERVED_IRQn             = 196 + 16,
-    //RESERVED_IRQn             = 197 + 16,
-    //RESERVED_IRQn             = 198 + 16,
-    //RESERVED_IRQn             = 199 + 16,
-    //RESERVED_IRQn             = 200 + 16,
-    //RESERVED_IRQn             = 201 + 16,
-    //RESERVED_IRQn             = 202 + 16,
-    //RESERVED_IRQn             = 203 + 16,
-    //RESERVED_IRQn             = 204 + 16,
-    //RESERVED_IRQn             = 205 + 16,
-    //RESERVED_IRQn             = 206 + 16,
-    //RESERVED_IRQn             = 207 + 16,
-    //RESERVED_IRQn             = 208 + 16,
-    //RESERVED_IRQn             = 209 + 16,
-    //RESERVED_IRQn             = 210 + 16,
-    //RESERVED_IRQn             = 211 + 16,
-    //RESERVED_IRQn             = 212 + 16,
-    //RESERVED_IRQn             = 213 + 16,
-    //RESERVED_IRQn             = 214 + 16,
-    //RESERVED_IRQn             = 215 + 16,
-    //RESERVED_IRQn             = 216 + 16,
-    //RESERVED_IRQn             = 217 + 16,
-    //RESERVED_IRQn             = 218 + 16,
-    //RESERVED_IRQn             = 219 + 16,
-    //RESERVED_IRQn             = 220 + 16,
-    //RESERVED_IRQn             = 221 + 16,
-    //RESERVED_IRQn             = 222 + 16,
-    //RESERVED_IRQn             = 223 + 16
+     // Errors
+     // RESERVED_IRQn             = 193 + 16,
+     // RESERVED_IRQn             = 194 + 16,
+     // RESERVED_IRQn             = 195 + 16,
+     // RESERVED_IRQn             = 196 + 16,
+     // RESERVED_IRQn             = 197 + 16,
+     // RESERVED_IRQn             = 198 + 16,
+     // RESERVED_IRQn             = 199 + 16,
+     // RESERVED_IRQn             = 200 + 16,
+     // RESERVED_IRQn             = 201 + 16,
+     // RESERVED_IRQn             = 202 + 16,
+     // RESERVED_IRQn             = 203 + 16,
+     // RESERVED_IRQn             = 204 + 16,
+     // RESERVED_IRQn             = 205 + 16,
+     // RESERVED_IRQn             = 206 + 16,
+     // RESERVED_IRQn             = 207 + 16,
+     // RESERVED_IRQn             = 208 + 16,
+     // RESERVED_IRQn             = 209 + 16,
+     // RESERVED_IRQn             = 210 + 16,
+     // RESERVED_IRQn             = 211 + 16,
+     // RESERVED_IRQn             = 212 + 16,
+     // RESERVED_IRQn             = 213 + 16,
+     // RESERVED_IRQn             = 214 + 16,
+     // RESERVED_IRQn             = 215 + 16,
+     // RESERVED_IRQn             = 216 + 16,
+     // RESERVED_IRQn             = 217 + 16,
+     // RESERVED_IRQn             = 218 + 16,
+     // RESERVED_IRQn             = 219 + 16,
+     // RESERVED_IRQn             = 220 + 16,
+     // RESERVED_IRQn             = 221 + 16,
+     // RESERVED_IRQn             = 222 + 16,
+     // RESERVED_IRQn             = 223 + 16
 } IRQn_Type;
 
 /*
@@ -247,28 +247,27 @@ typedef enum IRQn
  */
 
 /* Configuration of the Cortex M7 Processor and Core Peripherals */
-#define __VTOR_PRESENT          1       /*!< cm7ikmcu can support the VTOR                       */
-//#define __CM7_REV              0x0001U /*!< CM7 Core Revision                                                         */
-#define __NVIC_PRIO_BITS       4       /*!< Number of Bits used for Priority Levels                                   */
-#define __Vendor_SysTickConfig 0       /*!< Set to 1 if different SysTick Config is used                              */
-#define __MPU_PRESENT          1       /*!< MPU present                                                               */
-#define __FPU_PRESENT          1       /*!< FPU present                                                               */
-#define __FPU_DP               0       /*!< Double Precision FPU                                                      */
-#define __ICACHE_PRESENT       1       /*!< Instruction Cache present                                                 */
-#define __DCACHE_PRESENT       1       /*!< Data Cache present                                                        */
-#define __ITCM_PRESENT         0       /*!< Instruction TCM present                                                   */
-#define __DTCM_PRESENT         0       /*!< Data TCM present                                                          */
+#define __VTOR_PRESENT 1 /*!< cm7ikmcu can support the VTOR                       */
+// #define __CM7_REV              0x0001U /*!< CM7 Core Revision                                                         */
+#define __NVIC_PRIO_BITS 4       /*!< Number of Bits used for Priority Levels                                   */
+#define __Vendor_SysTickConfig 0 /*!< Set to 1 if different SysTick Config is used                              */
+#define __MPU_PRESENT 1          /*!< MPU present                                                               */
+#define __FPU_PRESENT 1          /*!< FPU present                                                               */
+#define __FPU_DP 0               /*!< Double Precision FPU                                                      */
+#define __ICACHE_PRESENT 1       /*!< Instruction Cache present                                                 */
+#define __DCACHE_PRESENT 1       /*!< Data Cache present                                                        */
+#define __ITCM_PRESENT 0         /*!< Instruction TCM present                                                   */
+#define __DTCM_PRESENT 0         /*!< Data TCM present                                                          */
 
+#include "core_cm7.h"     /* Cortex M7 processor and core peripherals              */
+#include "system_daric.h" /* daric System                                       */
 
-#include "core_cm7.h"                   /* Cortex M7 processor and core peripherals              */
-#include "system_daric.h"               /* daric System                                       */
-
-//#define BIT(n)           (1 << n)
-//#define MEM32_AT(adr)    (*(volatile unsigned int *) (adr))
-//#define PRINT_VA(value)  MEM32_AT(SFR1_BASE + 0x3fc) = (0x77 << 24) | (value & 0xffffff);
-//#define BRANCH_PASS(num) MEM32_AT(SFR1_BASE + 0x3fc) = (0xaaaaaa << 8) | (num & 0xff);
-//#define BRANCH_FAIL(num) MEM32_AT(SFR1_BASE + 0x3fc) = (0x555555 << 8) | (num & 0xff);
-//#define TEST_END()       MEM32_AT(SFR1_BASE + 0x3fc) = 0x66666666;
+// #define BIT(n)           (1 << n)
+// #define MEM32_AT(adr)    (*(volatile unsigned int *) (adr))
+// #define PRINT_VA(value)  MEM32_AT(SFR1_BASE + 0x3fc) = (0x77 << 24) | (value & 0xffffff);
+// #define BRANCH_PASS(num) MEM32_AT(SFR1_BASE + 0x3fc) = (0xaaaaaa << 8) | (num & 0xff);
+// #define BRANCH_FAIL(num) MEM32_AT(SFR1_BASE + 0x3fc) = (0x555555 << 8) | (num & 0xff);
+// #define TEST_END()       MEM32_AT(SFR1_BASE + 0x3fc) = 0x66666666;
 
 #ifndef __IM /*!< Fallback for older CMSIS versions                                         */
 #define __IM __I
@@ -293,7 +292,7 @@ typedef enum IRQn
  * @brief  Setup the microcontroller system
  *         Initialize the PLL and update the SystemFrequency variable
  */
-extern void SystemInit (void);
+extern void SystemInit(void);
 
 /**
  * Enable Caches
@@ -499,94 +498,94 @@ typedef struct
     __I  uint32_t TRCCIDR3;                    /*!< ETM CoreSight Component ID3 Register                                    */
 } ETM_Type;
 
-#define ETM_TRCPRGCTLR_EN_Pos            0                                      /*!< ETM TRCPRGCTLR: Trace Enable Position            */
-#define ETM_TRCPRGCTLR_EN_Msk            (1UL << ETM_TRCPRGCTLR_EN_Pos)         /*!< ETM TRCPRGCTLR: Trace Enable Mask                */
+#define ETM_TRCPRGCTLR_EN_Pos 0                              /*!< ETM TRCPRGCTLR: Trace Enable Position            */
+#define ETM_TRCPRGCTLR_EN_Msk (1UL << ETM_TRCPRGCTLR_EN_Pos) /*!< ETM TRCPRGCTLR: Trace Enable Mask                */
 
-#define ETM_TRCPROCSELR_PROCSEL_Pos      0                                      /*!< ETM TRCPROCSELR: Processor Select Position       */
-#define ETM_TRCPROCSELR_PROCSEL_Msk      (0x3UL << ETM_TRCPROCSELR_PROCSEL_Pos) /*!< ETM TRCPROCSELR: Processor Select Mask           */
+#define ETM_TRCPROCSELR_PROCSEL_Pos 0                                      /*!< ETM TRCPROCSELR: Processor Select Position       */
+#define ETM_TRCPROCSELR_PROCSEL_Msk (0x3UL << ETM_TRCPROCSELR_PROCSEL_Pos) /*!< ETM TRCPROCSELR: Processor Select Mask           */
 
-#define ETM_TRCSTATR_IDLE_Pos            0                                      /*!< ETM TRCSTATR: Idle Status Position               */
-#define ETM_TRCSTATR_IDLE_Msk            (1UL << ETM_TRCSTATR_IDLE_Pos)         /*!< ETM TRCSTATR: Idle Status Mask                   */
+#define ETM_TRCSTATR_IDLE_Pos 0                              /*!< ETM TRCSTATR: Idle Status Position               */
+#define ETM_TRCSTATR_IDLE_Msk (1UL << ETM_TRCSTATR_IDLE_Pos) /*!< ETM TRCSTATR: Idle Status Mask                   */
 
-#define ETM_TRCSTATR_PMSTABLE_Pos        0                                      /*!< ETM TRCSTATR: Programmers' Model Status Position */
-#define ETM_TRCSTATR_PMSTABLE_Msk        (1UL << ETM_TRCSTATR_PMSTABLE_Pos)     /*!< ETM TRCSTATR: Programmers' Model Status Mask     */
+#define ETM_TRCSTATR_PMSTABLE_Pos 0                                  /*!< ETM TRCSTATR: Programmers' Model Status Position */
+#define ETM_TRCSTATR_PMSTABLE_Msk (1UL << ETM_TRCSTATR_PMSTABLE_Pos) /*!< ETM TRCSTATR: Programmers' Model Status Mask     */
 
-#define ETM_TRCCONFIGR_INSTP0_Pos        1
-#define ETM_TRCCONFIGR_INSTP0_Msk        (0x3UL << ETM_TRCCONFIGR_INSTP0_Pos)
+#define ETM_TRCCONFIGR_INSTP0_Pos 1
+#define ETM_TRCCONFIGR_INSTP0_Msk (0x3UL << ETM_TRCCONFIGR_INSTP0_Pos)
 
-#define ETM_TRCCONFIGR_BB_Pos            3
-#define ETM_TRCCONFIGR_BB_Msk            (1UL << ETM_TRCCONFIGR_BB_Pos)
+#define ETM_TRCCONFIGR_BB_Pos 3
+#define ETM_TRCCONFIGR_BB_Msk (1UL << ETM_TRCCONFIGR_BB_Pos)
 
-#define ETM_TRCCONFIGR_CCI_Pos           4
-#define ETM_TRCCONFIGR_CCI_Msk           (1UL << ETM_TRCCONFIGR_CCI_Pos)
+#define ETM_TRCCONFIGR_CCI_Pos 4
+#define ETM_TRCCONFIGR_CCI_Msk (1UL << ETM_TRCCONFIGR_CCI_Pos)
 
-#define ETM_TRCCONFIGR_COND_Pos          8
-#define ETM_TRCCONFIGR_COND_Msk          (0x7UL << ETM_TRCCONFIGR_COND_Pos)
+#define ETM_TRCCONFIGR_COND_Pos 8
+#define ETM_TRCCONFIGR_COND_Msk (0x7UL << ETM_TRCCONFIGR_COND_Pos)
 
-#define ETM_TRCCONFIGR_TS_Pos            11
-#define ETM_TRCCONFIGR_TS_Msk            (1UL << ETM_TRCCONFIGR_TS_Pos)
+#define ETM_TRCCONFIGR_TS_Pos 11
+#define ETM_TRCCONFIGR_TS_Msk (1UL << ETM_TRCCONFIGR_TS_Pos)
 
-#define ETM_TRCCONFIGR_RS_Pos            12
-#define ETM_TRCCONFIGR_RS_Msk            (1UL << ETM_TRCCONFIGR_RS_Pos)
+#define ETM_TRCCONFIGR_RS_Pos 12
+#define ETM_TRCCONFIGR_RS_Msk (1UL << ETM_TRCCONFIGR_RS_Pos)
 
-#define ETM_TRCCONFIGR_DA_Pos            16
-#define ETM_TRCCONFIGR_DA_Msk            (1UL << ETM_TRCCONFIGR_DA_Pos)
+#define ETM_TRCCONFIGR_DA_Pos 16
+#define ETM_TRCCONFIGR_DA_Msk (1UL << ETM_TRCCONFIGR_DA_Pos)
 
-#define ETM_TRCCONFIGR_DV_Pos            17
-#define ETM_TRCCONFIGR_DV_Msk            (1UL << ETM_TRCCONFIGR_DV_Pos)
+#define ETM_TRCCONFIGR_DV_Pos 17
+#define ETM_TRCCONFIGR_DV_Msk (1UL << ETM_TRCCONFIGR_DV_Pos)
 
-#define ETM_TRCSYNCPR_PERIOD_Pos         0
-#define ETM_TRCSYNCPR_PERIOD_Msk         (0x1FUL << ETM_TRCSYNCPR_PERIOD_Pos)
+#define ETM_TRCSYNCPR_PERIOD_Pos 0
+#define ETM_TRCSYNCPR_PERIOD_Msk (0x1FUL << ETM_TRCSYNCPR_PERIOD_Pos)
 
-#define ETM_TRCTRACEIDR_TRACEID_Pos      0
-#define ETM_TRCTRACEIDR_TRACEID_Msk      (0x7FUL << ETM_TRCTRACEIDR_TRACEID_Pos)
+#define ETM_TRCTRACEIDR_TRACEID_Pos 0
+#define ETM_TRCTRACEIDR_TRACEID_Msk (0x7FUL << ETM_TRCTRACEIDR_TRACEID_Pos)
 
-#define ETM_TRCVICTLR_EVENT_Pos          0
-#define ETM_TRCVICTLR_EVENT_Msk          (0xFFUL << ETM_TRCVICTLR_EVENT_Pos)
+#define ETM_TRCVICTLR_EVENT_Pos 0
+#define ETM_TRCVICTLR_EVENT_Msk (0xFFUL << ETM_TRCVICTLR_EVENT_Pos)
 
-#define ETM_TRCVICTLR_SSSTATUS_Pos       9
-#define ETM_TRCVICTLR_SSSTATUS_Msk       (1UL << ETM_TRCVICTLR_SSSTATUS_Pos)
+#define ETM_TRCVICTLR_SSSTATUS_Pos 9
+#define ETM_TRCVICTLR_SSSTATUS_Msk (1UL << ETM_TRCVICTLR_SSSTATUS_Pos)
 
-#define ETM_TRCVICTLR_TRCRESET_Pos       10
-#define ETM_TRCVICTLR_TRCRESET_Msk       (1UL << ETM_TRCVICTLR_TRCRESET_Pos)
+#define ETM_TRCVICTLR_TRCRESET_Pos 10
+#define ETM_TRCVICTLR_TRCRESET_Msk (1UL << ETM_TRCVICTLR_TRCRESET_Pos)
 
-#define ETM_TRCVICTLR_TRCERR_Pos         11
-#define ETM_TRCVICTLR_TRCERR_Msk         (1UL << ETM_TRCVICTLR_TRCERR_Pos)
+#define ETM_TRCVICTLR_TRCERR_Pos 11
+#define ETM_TRCVICTLR_TRCERR_Msk (1UL << ETM_TRCVICTLR_TRCERR_Pos)
 
-#define ETM_TRCVICTLR_EXLEVEL_S_Pos      16
-#define ETM_TRCVICTLR_EXLEVEL_S_Msk      (0xFUL << ETM_TRCVICTLR_EXLEVEL_S_Pos)
+#define ETM_TRCVICTLR_EXLEVEL_S_Pos 16
+#define ETM_TRCVICTLR_EXLEVEL_S_Msk (0xFUL << ETM_TRCVICTLR_EXLEVEL_S_Pos)
 
-#define ETM_TRCVICTLR_EXLEVEL_NS_Pos     20
-#define ETM_TRCVICTLR_EXLEVEL_NS_Msk     (0xFUL << ETM_TRCVICTLR_EXLEVEL_NS_Pos)
+#define ETM_TRCVICTLR_EXLEVEL_NS_Pos 20
+#define ETM_TRCVICTLR_EXLEVEL_NS_Msk (0xFUL << ETM_TRCVICTLR_EXLEVEL_NS_Pos)
 
-#define ETM_TRCPIDR4_DES_2_Pos           0
-#define ETM_TRCPIDR4_DES_2_Msk           (0xFUL << ETM_TRCPIDR4_DES_2_Pos)
+#define ETM_TRCPIDR4_DES_2_Pos 0
+#define ETM_TRCPIDR4_DES_2_Msk (0xFUL << ETM_TRCPIDR4_DES_2_Pos)
 
-#define ETM_TRCPIDR4_SIZE_Pos            4
-#define ETM_TRCPIDR4_SIZE_Msk            (0xFUL << ETM_TRCPIDR4_SIZE_Pos)
+#define ETM_TRCPIDR4_SIZE_Pos 4
+#define ETM_TRCPIDR4_SIZE_Msk (0xFUL << ETM_TRCPIDR4_SIZE_Pos)
 
-#define ETM_TRCPIDR0_PART_0_Pos          0
-#define ETM_TRCPIDR0_PART_0_Msk          (0xFFUL << ETM_TRCPIDR4_PART_0_Pos)
+#define ETM_TRCPIDR0_PART_0_Pos 0
+#define ETM_TRCPIDR0_PART_0_Msk (0xFFUL << ETM_TRCPIDR4_PART_0_Pos)
 
-#define ETM_TRCPIDR1_PART_1_Pos          0
-#define ETM_TRCPIDR1_PART_1_Msk          (0xFUL << ETM_TRCPIDR1_PART_1_Pos)
+#define ETM_TRCPIDR1_PART_1_Pos 0
+#define ETM_TRCPIDR1_PART_1_Msk (0xFUL << ETM_TRCPIDR1_PART_1_Pos)
 
-#define ETM_TRCPIDR1_DES_0_Pos           4
-#define ETM_TRCPIDR1_DES_0_Msk           (0xFUL << ETM_TRCPIDR1_DES_0_Pos)
+#define ETM_TRCPIDR1_DES_0_Pos 4
+#define ETM_TRCPIDR1_DES_0_Msk (0xFUL << ETM_TRCPIDR1_DES_0_Pos)
 
-#define ETM_TRCPIDR2_DES_1_Pos           0
-#define ETM_TRCPIDR2_DES_1_Msk           (0x7UL << ETM_TRCPIDR2_DES_1_Pos)
+#define ETM_TRCPIDR2_DES_1_Pos 0
+#define ETM_TRCPIDR2_DES_1_Msk (0x7UL << ETM_TRCPIDR2_DES_1_Pos)
 
-#define ETM_TRCPIDR2_REVISION_Pos        4
-#define ETM_TRCPIDR2_REVISION_Msk        (0xFUL << ETM_TRCPIDR2_REVISION_Pos)
+#define ETM_TRCPIDR2_REVISION_Pos 4
+#define ETM_TRCPIDR2_REVISION_Msk (0xFUL << ETM_TRCPIDR2_REVISION_Pos)
 
-#define ETM_TRCPIDR3_CMOD_Pos            0
-#define ETM_TRCPIDR3_CMOD_Msk            (0xFUL << ETM_TRCPIDR3_CMOD_Pos)
+#define ETM_TRCPIDR3_CMOD_Pos 0
+#define ETM_TRCPIDR3_CMOD_Msk (0xFUL << ETM_TRCPIDR3_CMOD_Pos)
 
-#define ETM_TRCPIDR3_REVAND_Pos          4
-#define ETM_TRCPIDR3_REVAND_Msk          (0xFUL << ETM_TRCPIDR3_REVAND_Pos)
+#define ETM_TRCPIDR3_REVAND_Pos 4
+#define ETM_TRCPIDR3_REVAND_Msk (0xFUL << ETM_TRCPIDR3_REVAND_Pos)
 
-#define ETM_TRCLAR_KEY_UNLOCK            0xC5ACCE55UL
+#define ETM_TRCLAR_KEY_UNLOCK 0xC5ACCE55UL
 
 /******************************************************************************/
 /*                  Cortex-M7 CTI registers structures                       */
@@ -701,18 +700,18 @@ typedef struct
     __I  uint32_t CID3;                         /*!< Offset 0xFFC (R ) CoreSight register                            */
 } TPIU_Type;
 
-#define TPIU_FFCR_STOPF1_Pos      12
-#define TPIU_FFCR_STOPF1_MSK      (0x1UL << TPIU_FFCR_STOPF1_Pos)
+#define TPIU_FFCR_STOPF1_Pos 12
+#define TPIU_FFCR_STOPF1_MSK (0x1UL << TPIU_FFCR_STOPF1_Pos)
 
-#define TPIU_FFSR_FLINPROG_Pos    0
-#define TPIU_FFSR_FLINPROG_MSK    (0x1UL << TPIU_FFCR_STOPF1_Pos)
+#define TPIU_FFSR_FLINPROG_Pos 0
+#define TPIU_FFSR_FLINPROG_MSK (0x1UL << TPIU_FFCR_STOPF1_Pos)
 
-#define TPIU_SPPR_TXMODE_Pos      0
-#define TPIU_SPPR_TXMODE_Msk      (0x3UL << TPIU_SPPR_TXMODE_Pos)
+#define TPIU_SPPR_TXMODE_Pos 0
+#define TPIU_SPPR_TXMODE_Msk (0x3UL << TPIU_SPPR_TXMODE_Pos)
 
-#define TPIU_PIN_TRACEPORT        0          /*!< TPIU Selected Pin Protocol Parallel Port  */
-#define TPIU_PIN_SWO_MANCHESTER   1          /*!< TPIU Selected Pin Protocol SWO Manchester */
-#define TPIU_PIN_SWO_NRZ          2          /*!< TPIU Selected Pin Protocol SWO NRZ (uart) */
+#define TPIU_PIN_TRACEPORT 0      /*!< TPIU Selected Pin Protocol Parallel Port  */
+#define TPIU_PIN_SWO_MANCHESTER 1 /*!< TPIU Selected Pin Protocol SWO Manchester */
+#define TPIU_PIN_SWO_NRZ 2        /*!< TPIU Selected Pin Protocol SWO NRZ (uart) */
 
 /******************************************************************************/
 /*                Device Specific Peripheral registers structures             */
@@ -738,55 +737,55 @@ typedef struct
 /*          CoreSight and other Peripheral memory map                         */
 /******************************************************************************/
 /* CoreSight Components */
-#define TPIU_BASE                 0xE0040000UL
-#define ETM_BASE                  0xE0041000UL
-#define CTI_BASE                  0xE0042000UL
-#define FPB_BASE                  0xE0002000UL
+#define TPIU_BASE 0xE0040000UL
+#define ETM_BASE 0xE0041000UL
+#define CTI_BASE 0xE0042000UL
+#define FPB_BASE 0xE0002000UL
 
-#define DWT_CTRL_SYNCTAP24        1 << 10
-#define DWT_CTRL_SYNCTAP26        2 << 10
-#define DWT_CTRL_SYNCTAP28        3 << 10
+#define DWT_CTRL_SYNCTAP24 1 << 10
+#define DWT_CTRL_SYNCTAP26 2 << 10
+#define DWT_CTRL_SYNCTAP28 3 << 10
 
-#define DWT_FUNC_SAMP_PC          0x1
-#define DWT_FUNC_SAMP_DATA        0x2
-#define DWT_FUNC_SAMP_PC_DATA     0x3
-#define DWT_FUNC_PC_WPT           0x4
-#define DWT_FUNC_TRIG_PC          0x8
-#define DWT_FUNC_TRIG_RD          0x9
-#define DWT_FUNC_TRIG_WR          0xA
-#define DWT_FUNC_TRIG_RW          0xB
+#define DWT_FUNC_SAMP_PC 0x1
+#define DWT_FUNC_SAMP_DATA 0x2
+#define DWT_FUNC_SAMP_PC_DATA 0x3
+#define DWT_FUNC_PC_WPT 0x4
+#define DWT_FUNC_TRIG_PC 0x8
+#define DWT_FUNC_TRIG_RD 0x9
+#define DWT_FUNC_TRIG_WR 0xA
+#define DWT_FUNC_TRIG_RW 0xB
 
-#define DWT_CTRL_POSTPRESET_10    0xA
+#define DWT_CTRL_POSTPRESET_10 0xA
 
-#define ITM_TER_STIM0             1 << 0
-#define ITM_TER_STIM1             1 << 1
-#define ITM_TER_STIM2             1 << 2
+#define ITM_TER_STIM0 1 << 0
+#define ITM_TER_STIM1 1 << 1
+#define ITM_TER_STIM2 1 << 2
 
-#define ITM_TCR_TS_GLOBAL_128     0x01 << ITM_TCR_GTSFREQ_Pos
-#define ITM_TCR_TS_GLOBAL_8192    0x10 << ITM_TCR_GTSFREQ_Pos
-#define ITM_TCR_TS_GLOBAL_ALL     0x11 << ITM_TCR_GTSFREQ_Pos
+#define ITM_TCR_TS_GLOBAL_128 0x01 << ITM_TCR_GTSFREQ_Pos
+#define ITM_TCR_TS_GLOBAL_8192 0x10 << ITM_TCR_GTSFREQ_Pos
+#define ITM_TCR_TS_GLOBAL_ALL 0x11 << ITM_TCR_GTSFREQ_Pos
 #endif
 
 /* Peripheral and SRAM base address */
-#define SRAM_BASE                 0x20000000UL
-#define PERIPH_BASE               0x40000000UL
+#define SRAM_BASE 0x61000000UL
+#define PERIPH_BASE 0x40000000UL
 
 /* Peripheral memory map */
-//#define GPIO_BASE              PERIPH_BASE
+// #define GPIO_BASE              PERIPH_BASE
 //
-//#define GPIO0_BASE              (GPIO_BASE)
-//#define GPIO1_BASE              (GPIO_BASE       + 0x0800UL)
-//#define GPIO2_BASE              (GPIO_BASE       + 0x1000UL)
+// #define GPIO0_BASE              (GPIO_BASE)
+// #define GPIO1_BASE              (GPIO_BASE       + 0x0800UL)
+// #define GPIO2_BASE              (GPIO_BASE       + 0x1000UL)
 
 /******************************************************************************/
 /*                         Declaration                                        */
 /******************************************************************************/
-//#define ETM                       ((ETM_Type     *) ETM_BASE)
-//#define TPIU                      ((TPIU_Type    *) TPIU_BASE)
-//#define CTI                       ((CTI_Type     *) CTI_BASE)
+// #define ETM                       ((ETM_Type     *) ETM_BASE)
+// #define TPIU                      ((TPIU_Type    *) TPIU_BASE)
+// #define CTI                       ((CTI_Type     *) CTI_BASE)
 
-//#define GPIO0                  ((GPIO_TypeDef *) GPIO0_BASE)
-//#define GPIO1                  ((GPIO_TypeDef *) GPIO1_BASE)
-//#define GPIO2                  ((GPIO_TypeDef *) GPIO2_BASE)
+// #define GPIO0                  ((GPIO_TypeDef *) GPIO0_BASE)
+// #define GPIO1                  ((GPIO_TypeDef *) GPIO1_BASE)
+// #define GPIO2                  ((GPIO_TypeDef *) GPIO2_BASE)
 
 #endif

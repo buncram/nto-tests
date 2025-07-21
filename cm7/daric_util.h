@@ -76,10 +76,18 @@ typedef struct
     volatile uint32_t CFG_RST;
 } UDMACORE_T;
 
-/* <<< MODIFIED: This is part of the original project, so we RESTORE it. >>> */
 extern volatile UDMACORE_T *const UDMACORE;
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
-extern uint32_t SystemCoreClock;
+    extern uint32_t SystemCoreClock;
+    void enable_fpu(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 typedef struct
 {

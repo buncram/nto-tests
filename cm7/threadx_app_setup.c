@@ -4,6 +4,7 @@
 
 // Declare the C-linkage function from the TFLM wrapper
 extern void run_tflm_hello_world_test(void);
+// extern void run_tflm_person_detection_test(void);
 
 /*
  * This is the memory pool that our custom malloc() in libc-hooks.c
@@ -27,6 +28,7 @@ void tx_application_define(void *first_unused_memory)
         return;
     }
 
+    /*
     print_string("Enabling DCache from tx_application_define()...\r\n");
     SCB_EnableDCache();
     if ((SCB->CCR & SCB_CCR_DC_Msk) != 0)
@@ -34,6 +36,7 @@ void tx_application_define(void *first_unused_memory)
         SCB_CleanDCache();
         print_string("DCache enabled and cleaned successfully!\r\n");
     }
+        */
 
 /* --- Main Test Thread Objects --- */
 // Use the larger stack size required by the TFLM test.
@@ -50,10 +53,18 @@ void tx_application_define(void *first_unused_memory)
         // 1. Run Libc tests
         run_libc_tests();
 
-        // 2. Run TFLM Hello World test
+        // Run the Hello World test first
         print_string("\r\nSUCCESS: Starting TFLM Hello World test.\r\n");
         run_tflm_hello_world_test();
         print_string("\r\nSUCCESS: TFLM Hello World test completed.\r\n");
+
+        // Give the system a moment to settle, if desired
+        tx_thread_sleep(100); // Sleep for 100 ticks (e.g., 100 ms)
+
+        // Run the Person Detection test
+        print_string("\r\nSUCCESS: Starting TFLM Person Detection test.\r\n");
+        // run_tflm_person_detection_test();
+        print_string("\r\nSUCCESS: TFLM Person Detection test completed.\r\n");
 
         // All tests are done, enter an infinite loop.
         while (1)

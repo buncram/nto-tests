@@ -15,9 +15,10 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/system_setup.h"
 
-// Include platform-specific headers
-#include "daric_cm7.h"
+#include "daric_hal.h"
+#include "core_cm7.h"
 #include "daric_util.h"
+#include "tflm_debug_log.h"
 #include "tx_api.h" // Needed for DebugLog, which might use ThreadX-aware printf if hooked
 
 // This function is called by the TFLM framework to perform target-specific setup.

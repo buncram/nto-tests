@@ -8,7 +8,7 @@ extern "C"
 #endif
 
     // The function declaration
-    void DebugLog(const char *format, ...);
+    void DebugLog(const char *format, va_list args);
 
 #ifdef __cplusplus
 }

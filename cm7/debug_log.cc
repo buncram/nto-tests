@@ -63,6 +63,33 @@ extern "C" void DebugLog(const char *format, va_list args)
 #endif
 }
 
+extern "C" void DebugSane(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    // A buffer to hold the formatted string.
+    // Make sure this is large enough for your logging needs.
+    char log_buffer[256];
+
+    // Use vsnprintf to safely format the string into the buffer.
+    vsnprintf(log_buffer, sizeof(log_buffer), format, args);
+
+    // Ensure the buffer is null-terminated, just in case vsnprintf truncated it.
+    log_buffer[sizeof(log_buffer) - 1] = '\0';
+
+    // Use the platform-specific print function to output the formatted string.
+    print_string(log_buffer);
+
+    // Add a newline if the formatted string doesn't already have one.
+    // This is helpful for readability in serial terminals.
+    const int length = strlen(log_buffer);
+    if (length > 0 && log_buffer[length - 1] != '\n')
+    {
+        print_string("\r");
+    }
+    va_end(args);
+}
+
 #ifndef TF_LITE_STRIP_ERROR_STRINGS
 // This function is also part of the TFLM debug logging API and is used
 // by the MicroVsnprintf function in micro_log.h. It provides a C-linkage

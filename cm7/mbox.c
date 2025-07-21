@@ -27,7 +27,7 @@ uint8_t ReramWrite(uint32_t dstAddr, uint8_t *pWtBuf, uint32_t wtLen);
 
 #define USE_DELAY 0
 
-#define SRAM_TEXT_START 0x61100000UL
+// #define SRAM_TEXT_START 0x61100000UL
 
 extern uint32_t __INITIAL_SP;
 
@@ -211,6 +211,17 @@ void enable_fpu()
 
 void Reset_Handler(void)
 {
+    // Now, continue with your original hardware setup
+    for (volatile int i = 0; i < 5000000; i++)
+    {
+        __asm__("nop");
+    }
+
+    for (int i = 0; i < 10; i++)
+    {
+        print_string("Hello from CM7!\r");
+    }
+
     // --- START: C/C++ DATA INITIALIZATION ---
     // This code must run before any other C code.
 
@@ -230,21 +241,10 @@ void Reset_Handler(void)
     }
     // --- END: C/C++ DATA INITIALIZATION ---
 
-    // Now, continue with your original hardware setup
-    for (volatile int i = 0; i < 5000000; i++)
-    {
-        __asm__("nop");
-    }
-
     *((volatile uint32_t *)0x4001400C) = 0x8;
 
     *((volatile uint32_t *)0x40014000) = 0x3; // sramcfg.cach:ema[2:0]=0x4 (default for 0.8V), 0x3 for 0.9V
     *((volatile uint32_t *)0x40014014) = 0x1; // sramcfg.vexram:ema[2:0]=0x4 (default for 0.8V), 0x1 for 0.9V
-
-    for (int i = 0; i < 10; i++)
-    {
-        print_string("Hello from CM7!\r");
-    }
 
     *((unsigned int *)0x40014004) = 5;
     *((unsigned int *)0x40014008) = 5;
@@ -567,94 +567,110 @@ static void Platform_Init(void)
     ARM_MPU_Disable();
 
     /* Load the new MPU configuration */
+#if 0
     ARM_MPU_Load(&mpu_config_table[0],
                  sizeof(mpu_config_table) / sizeof(mpu_config_table[0]));
 
     /* Enable MPU with default private memory background access */
     ARM_MPU_Enable(MPU_CTRL_PRIVDEFENA_Msk);
+#endif
 }
 
 // Add this function to debug your MPU configuration
 void debug_mpu_regions(void)
 {
-    // print_string("=== MPU Region Debug ===\r\n");
+    print_string("=== MPU Region Debug ===\r\n");
 
-    // for (int i = 0; i < 8; i++)
-    // {
-    //     // Select region
-    //     MPU->RNR = i;
+    for (int i = 0; i < 8; i++)
+    {
+        // Select region
+        MPU->RNR = i;
 
-    //     print_string("Region ");
-    //     send_u32_hex(i);
-    //     print_string(": RBAR=");
-    //     send_u32_hex(MPU->RBAR);
-    //     print_string(" RASR=");
-    //     send_u32_hex(MPU->RASR);
-    //     print_string("\r\n");
-    // }
+        print_string("Region ");
+        send_u32_hex(i);
+        print_string(": RBAR=");
+        send_u32_hex(MPU->RBAR);
+        print_string(" RASR=");
+        send_u32_hex(MPU->RASR);
+        print_string("\r\n");
+    }
 
     print_string("MPU CTRL: ");
     send_u32_hex(MPU->CTRL);
     print_string("\r\n");
 }
 
-void configure_cacheable_mpu(void)
+static void Platform_Init_MPU(void)
 {
-    print_string("Configuring MPU for DCache...\r\n");
+    print_string("Configuring MPU for safe caching (Write-Through)...\r\n");
+
+    // This table is a copy of DARIC_MPU_CONFIG from the SDK.
+    // We are now using the original Write-Through setting for SRAM.
+    static ARM_MPU_Region_t mpu_config_table[] = {
+        /* Region 0: ITCM, 256KB, Non-cacheable */
+        {ARM_MPU_RBAR(0, 0x00000000), ARM_MPU_RASR(0, ARM_MPU_AP_RO, 1, 0, 0, 0, 0, ARM_MPU_REGION_SIZE_256KB)},
+        /* Region 1: DTCM, 64KB, Non-cacheable */
+        {ARM_MPU_RBAR(1, 0x20000000), ARM_MPU_RASR(1, ARM_MPU_AP_FULL, 1, 0, 0, 0, 0, ARM_MPU_REGION_SIZE_64KB)},
+        /* Region 2: IFRAM, 256KB, Non-cacheable */
+        {ARM_MPU_RBAR(2, 0x50000000), ARM_MPU_RASR(1, ARM_MPU_AP_FULL, 1, 0, 0, 0, 0, ARM_MPU_REGION_SIZE_256KB)},
+        /* Region 3: ReRAM boot, 256B, Write-Through */
+        {ARM_MPU_RBAR(3, 0x60000000), ARM_MPU_RASR(0, ARM_MPU_AP_RO, 0, 0, 1, 0, 0, ARM_MPU_REGION_SIZE_256B)},
+        /* Region 4: ReRAM firmware, 2MB, Write-Through */
+        {ARM_MPU_RBAR(4, 0x60040000), ARM_MPU_RASR(0, ARM_MPU_AP_RO, 0, 0, 1, 0, 0, ARM_MPU_REGION_SIZE_2MB)},
+        /* Region 5: ReRAM data, 1MB, Write-Through */
+        {ARM_MPU_RBAR(5, 0x60240000), ARM_MPU_RASR(0, ARM_MPU_AP_FULL, 0, 0, 1, 0, 0, ARM_MPU_REGION_SIZE_1MB)},
+        /* Region 6: ReRAM nvram, 512KB, Write-Through */
+        {ARM_MPU_RBAR(6, 0x60340000), ARM_MPU_RASR(0, ARM_MPU_AP_FULL, 0, 0, 1, 0, 0, ARM_MPU_REGION_SIZE_512KB)},
+        /* Region 7: ReRAM aon, 256B, Write-Through */
+        {ARM_MPU_RBAR(7, 0x603C0000), ARM_MPU_RASR(0, ARM_MPU_AP_RO, 0, 0, 1, 0, 0, ARM_MPU_REGION_SIZE_256B)},
+
+        /* == REVERTED REGION == */
+        /* Region 8: SRAM, 2MB, rw, Normal memory, Write-THROUGH, shareable */
+        // Reverting B (Bufferable) bit from 1 to 0 to select Write-Through.
+        {ARM_MPU_RBAR(8, 0x61000000), ARM_MPU_RASR(0, ARM_MPU_AP_FULL, 0, 1, 1, 0, 0, ARM_MPU_REGION_SIZE_2MB)},
+
+        /* Region 9: Peripherals */
+        {ARM_MPU_RBAR(9, 0x40000000), ARM_MPU_RASR(1, ARM_MPU_AP_FULL, 2, 0, 0, 0, 0, ARM_MPU_REGION_SIZE_1GB)}};
 
     ARM_MPU_Disable();
-
-    // Region 6: Main SRAM (0x61000000) - cacheable write-back
-    uint32_t rbar_sram = ARM_MPU_RBAR(6, 0x61000000);
-    uint32_t rasr_sram = ARM_MPU_RASR(0, ARM_MPU_AP_FULL, 0, 1, 1, 1, 0, ARM_MPU_REGION_SIZE_2MB);
-    ARM_MPU_SetRegion(rbar_sram, rasr_sram);
-
-    // Region 7: Peripherals (0x40000000) - non-cacheable device memory
-    uint32_t rbar_periph = ARM_MPU_RBAR(7, 0x40000000);
-    uint32_t rasr_periph = ARM_MPU_RASR(0, ARM_MPU_AP_FULL, 2, 1, 0, 0, 0, ARM_MPU_REGION_SIZE_1GB);
-    ARM_MPU_SetRegion(rbar_periph, rasr_periph);
-
+    ARM_MPU_Load(&mpu_config_table[0], sizeof(mpu_config_table) / sizeof(mpu_config_table[0]));
     ARM_MPU_Enable(MPU_CTRL_PRIVDEFENA_Msk);
 
-    print_string("MPU configured for caching\r\n");
+    print_string("MPU configured successfully.\r\n");
 }
 
 void main_loop()
 {
-    // Platform initialization - MPU must be configured before enabling DCache
-
+    // Basic CPU and C/C++ runtime setup
     enable_fpu();
     __libc_init_array();
 
-    Platform_Init();
-    print_string("CM7 up\r\n");
+    // 1. Initialize the MPU with our new, complete, and optimized configuration.
+    // Platform_Init_MPU();
 
-    configure_cacheable_mpu();
-    debug_mpu_regions();
+    // 2. Enable the Instruction Cache.
+    // print_string("Enabling I-Cache...\r\n");
+    // SCB_EnableICache();
+    // print_string("I-Cache enabled.\r\n");
 
-    // Enable instruction and data caches
-    print_string("Enabling Caches...\r\n");
-
-    SCB_EnableICache();
-    print_string("ICache enabled\r\n");
-
-    // SCB->CCR |= SCB_CCR_DC_Msk;
-    // print_string("DCache enabled!\r\n");
-
-    // // Basic memory test using stack variables
-    // print_string("Testing memory with DCache...\r\n");
-    // uint32_t test_val = 0x12345678;
-
-    // if (test_val == 0x12345678)
+    // // 3. Enable the Data Cache.
+    // print_string("Enabling D-Cache...\r\n");
+    // SCB_EnableDCache();
+    // print_string("hi\r\n");
+    // if ((SCB->CCR & SCB_CCR_DC_Msk) == 0) // Only if it's off
     // {
-    //     print_string("Memory test OK\r\n");
+    //     print_string("IN THE IF\r\n");
+    //     SCB_InvalidateDCache(); // Good practice before enabling
+    //     print_string("A\r\n");
+    //     SCB->CCR |= SCB_CCR_DC_Msk;
+    //     print_string("B\r\n");
+    //     __DSB(); // Wait for memory operations to complete
+    //     print_string("C\r\n");
+    //     __ISB(); // Flush the pipeline
+    //     print_string("D-Cache enabled.\r\n");
     // }
 
-    // // Disable DCache before ThreadX (cache clean operations cause hang)
-    print_string("Disabling DCache for ThreadX compatibility...\r\n");
-    SCB->CCR &= ~SCB_CCR_DC_Msk;
-    print_string("DCache disabled\r\n");
-
+    // Now, enter the RTOS with caches fully enabled.
     print_string("Entering ThreadX...\r\n");
     tx_kernel_enter();
 

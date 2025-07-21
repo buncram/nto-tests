@@ -27,7 +27,7 @@ TFLM_ROOT := $(pathmf)/tflm
 # We are being more selective now, as many core files are at the top level
 # Exclude test files (*_test.cc)
 TFLM_CORE_SRCS_C := $(shell find $(TFLM_ROOT) -name "*.c" ! -name "*_test.c")
-TFLM_CORE_SRCS_CXX := $(shell find $(TFLM_ROOT) -name "*.cc" ! -name "*_test.cc")
+TFLM_CORE_SRCS_CXX := $(shell find $(TFLM_ROOT) -name "*.cc" ! -name "*_test.cc" ! -path "*/signal/*")
 
 # Remove some specific .su files that might be just symbolic links or duplicates if find picks them up
 # and we are explicitly listing their actual .cc/.c counterparts.
@@ -35,6 +35,13 @@ TFLM_CORE_SRCS_CXX := $(shell find $(TFLM_ROOT) -name "*.cc" ! -name "*_test.cc"
 TFLM_EXCLUDE_SRCS := \
     $(TFLM_ROOT)/examples/person_detection/main.cc \
     $(TFLM_ROOT)/tensorflow/lite/micro/debug_log.cc \
+    $(TFLM_ROOT)/tensorflow/lite/micro/test_helpers.cc \
+    $(TFLM_ROOT)/tensorflow/lite/micro/mock_micro_graph.cc \
+    $(TFLM_ROOT)/tensorflow/lite/micro/fake_micro_context.cc \
+    $(TFLM_ROOT)/tensorflow/lite/micro/test_helper_custom_ops.cc \
+	$(TFLM_ROOT)/tensorflow/lite/micro/kernels/circular_buffer.cc \
+    $(TFLM_ROOT)/examples/person_detection/person_detection_test.cc \
+
 
 TFLM_CORE_SRCS_C := $(filter-out $(TFLM_EXCLUDE_SRCS), $(TFLM_CORE_SRCS_C))
 TFLM_CORE_SRCS_CXX := $(filter-out $(TFLM_EXCLUDE_SRCS), $(TFLM_CORE_SRCS_CXX))
@@ -42,11 +49,14 @@ TFLM_CORE_SRCS_CXX := $(filter-out $(TFLM_EXCLUDE_SRCS), $(TFLM_CORE_SRCS_CXX))
 # Explicitly add the example-specific source files that are clearly present
 # We see these under tflm/examples/person_detection directly.
 PERSON_DETECTION_SRCS_CXX := \
-    $(TFLM_ROOT)/examples/person_detection/main.cc \
     $(TFLM_ROOT)/examples/person_detection/main_functions.cc \
     $(TFLM_ROOT)/examples/person_detection/model_settings.cc \
     $(TFLM_ROOT)/examples/person_detection/detection_responder.cc \
-    $(TFLM_ROOT)/examples/person_detection/image_provider.cc
+    $(TFLM_ROOT)/examples/person_detection/image_provider.cc \
+    $(TFLM_ROOT)/examples/person_detection/testdata/person_image_data.cc \
+    $(TFLM_ROOT)/examples/person_detection/testdata/no_person_image_data.cc \
+     $(TFLM_ROOT)/examples/person_detection/testdata/bunnie_image_data.cc \
+    # person_detect_model_data.cc
 
 HELLO_WORLD_SRCS_CXX := \
     $(TFLM_ROOT)/examples/hello_world/hello_world_test.cc
@@ -95,7 +105,10 @@ PROJECT_CXX_SRCS := \
     tflm_platform_utils.cc \
     dso_handle.cc \
     tflm_hello_world_wrapper.cc \
-    # debug_log.cc
+    debug_log.cc \
+    tflm_person_detection_wrapper.cc \
+
+
 
 # --- Automatically find all source files in those directories ---
 THREADX_COMMON_SRCS_C := $(wildcard $(THREADX_COMMON_PATH)/*.c)
@@ -104,7 +117,7 @@ THREADX_PORT_SRCS_S   := $(wildcard $(THREADX_PORT_PATH)/*.S)
 THREADX_INIT_SRC_S  := $(wildcard $(THREADX_PORT_EXAMPLE_PATH)/tx_initialize_low_level.S)
 
 # --- Create final source lists ---
-PROJECT_SRCS = mbox.c daric_util.c reram.c threadx_app_setup.c tflm_debug_log.c
+PROJECT_SRCS = mbox.c daric_util.c reram.c threadx_app_setup.c
 LIBC_HOOK_SRCS = libc-hooks.c
 
 C_SRCS := \
@@ -121,7 +134,7 @@ CXX_SRCS := \
     $(PROJECT_CXX_SRCS) \
     $(TFLM_CORE_SRCS_CXX) \
     $(HELLO_WORLD_SRCS_CXX) \
-    # $(PERSON_DETECTION_SRCS_CXX) \
+    $(PERSON_DETECTION_SRCS_CXX) \
     # $(SIGNAL_SRCS_CXX) \
     # $(MICRO_SPEECH_TEST_SRCS_CXX)
 
@@ -151,6 +164,8 @@ VPATH := $(APP_SETUP_PATH) \
          $(TFLM_ROOT)/tensorflow/lite/micro/tools/make/downloads/flatbuffers/include \
          $(TFLM_ROOT)/tensorflow/lite/micro/compatibility \
          $(TFLM_ROOT)/examples/person_detection \
+         $(TFLM_ROOT)/examples/person_detection/testdata \
+         $(TFLM_ROOT)/tensorflow/lite/micro/models \
          $(TFLM_ROOT)/examples/micro_speech \
          $(TFLM_ROOT)/examples/micro_speech/testdata \
          $(TFLM_ROOT)/examples/hello_world \
@@ -170,6 +185,7 @@ VPATH := $(APP_SETUP_PATH) \
          $(TFLM_ROOT)/third_party/ruy \
          $(TFLM_ROOT)/third_party/ruy/ruy
 
+
 # Add these flags to enable floating point support in printf/scanf
 PRINTF_FLOAT_LDFLAGS := -Wl,-u,vfprintf
 PRINTF_FLOAT_LDLIBS  := -lprintf_flt
@@ -177,7 +193,12 @@ PRINTF_FLOAT_LDLIBS  := -lprintf_flt
 # --- Finalized Compiler Flags ---
 # Use soft-float for libc compatibility, but tell the toolchain the FPU exists for assembly/context-switching.
 COMMONFLAGS += -mfloat-abi=hard -mfpu=fpv5-d16 -DARMCM7 -D__FPU_PRESENT=1
-COMMONFLAGS += -time -O3 -g -fno-exceptions
+# -O3 is the highest optimization level. -flto enables Link-Time Optimization.
+# -ffunction-sections and -fdata-sections are required for the linker to remove unused code.
+COMMONFLAGS += -O3 -flto -ffunction-sections -fdata-sections -fno-exceptions
+
+# CXXFLAGS are more aggressive without -fno-strict-aliasing, but require compliant code.
+CXXFLAGS += -fstack-usage -std=c++17 -fno-rtti
 
 CXXFLAGS += -fno-strict-aliasing -fstack-usage -std=c++17 -fno-rtti
 
@@ -245,6 +266,7 @@ TFLM_INCLUDES := \
     -I$(TFLM_ROOT)/tensorflow/lite/micro/tools/make/downloads/flatbuffers/include \
     -I$(TFLM_ROOT)/tensorflow/lite/micro/compatibility \
     -I$(TFLM_ROOT)/examples/person_detection \
+    -I$(TFLM_ROOT)/examples/person_detection/testdata \
     -I$(TFLM_ROOT)/examples/micro_speech \
     -I$(TFLM_ROOT)/examples/micro_speech/testdata \
     -I$(TFLM_ROOT)/examples/hello_world \
@@ -268,7 +290,8 @@ CXXFLAGS += $(INCLUDES) $(FIDO2_CONFIG_INCLUDES) $(TFLM_INCLUDES) $(FIDO2_CONFIG
 
 # --- Finalized Linker Flags ---
 MALLOC_UNDEFINES := -Wl,-u,malloc,-u,calloc,-u,free,-u,realloc,-u,_malloc_r,-u,_calloc_r,-u,_free_r,-u,_realloc_r,-u,aligned_alloc
-LDFLAGS += $(COMMONFLAGS) -Wl,--gc-sections,$(addprefix -T,$(LD_FILES)) --debug $(MALLOC_UNDEFINES) --specs=nano.specs -u _printf_float
+# Added -flto to enable Link-Time Optimization and removed --debug for release builds.
+LDFLAGS += $(COMMONFLAGS) -Wl,--gc-sections,$(addprefix -T,$(LD_FILES)) $(MALLOC_UNDEFINES) --specs=nano.specs -u _printf_float -Wl,-Map=mbox.map
 LDLIBS   = -lm -lstdc++
 
 ######### Rules #########
