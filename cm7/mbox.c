@@ -649,27 +649,7 @@ void main_loop()
     // Platform_Init_MPU();
 
     // 2. Enable the Instruction Cache.
-    // print_string("Enabling I-Cache...\r\n");
-    // SCB_EnableICache();
-    // print_string("I-Cache enabled.\r\n");
-
-    // // 3. Enable the Data Cache.
-    // print_string("Enabling D-Cache...\r\n");
-    // SCB_EnableDCache();
-    // print_string("hi\r\n");
-    // if ((SCB->CCR & SCB_CCR_DC_Msk) == 0) // Only if it's off
-    // {
-    //     print_string("IN THE IF\r\n");
-    //     SCB_InvalidateDCache(); // Good practice before enabling
-    //     print_string("A\r\n");
-    //     SCB->CCR |= SCB_CCR_DC_Msk;
-    //     print_string("B\r\n");
-    //     __DSB(); // Wait for memory operations to complete
-    //     print_string("C\r\n");
-    //     __ISB(); // Flush the pipeline
-    //     print_string("D-Cache enabled.\r\n");
-    // }
-
+    // gi
     // Now, enter the RTOS with caches fully enabled.
     print_string("Entering ThreadX...\r\n");
     tx_kernel_enter();
