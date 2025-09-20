@@ -9,8 +9,9 @@ utralib = { path = "../utralib" }
 riscv = { version = "0.5.6", package = "xous-riscv" }
 xous-bio-bdma = { path = "../../xous-core/libs/xous-bio-bdma", default-features = false, features = [
     "tests",
-    "cramium-soc",
+    "bao1x",
     "baremetal",
+    "debug-print",
 ] }
 # xous-pio = { path = "../../xous-core/libs/xous-pio", default-features = false, features = [
 #     "tests",
@@ -19,16 +20,16 @@ xous-bio-bdma = { path = "../../xous-core/libs/xous-bio-bdma", default-features 
 # ] }
 xous-pl230 = { path = "../../xous-core/libs/xous-pl230", default-features = false, features = [
     "tests",
-    "cramium-soc",
+    "bao1x",
     "dma-mainram",
     "baremetal",
 ] }
-cramium-hal = { path = "../../xous-core/libs/cramium-hal", default-features = false, features = [
+cramium-hal = { package = "bao1x-hal", path = "../../xous-core/libs/bao1x-hal", default-features = false, features = [
     "udma-stress-test",
     "test-baosec",
     "hdl-test",
 ] }
-cramium-api = { path = "../../xous-core/libs/cramium-api" }
+cramium-api = { package = "bao1x-api", path = "../../xous-core/libs/bao1x-api" }
 pio-proc = { version = "0.2.2", optional = true }
 pio = { version = "0.2.1", optional = true }
 # Used by AES tests

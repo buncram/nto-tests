@@ -13,6 +13,5 @@ svd2utra = { path = "../svd2utra/" }
 
 [features]
 std = []
-cramium-soc = []
-cramium-fpga = []
+bao1x = []
 default = []

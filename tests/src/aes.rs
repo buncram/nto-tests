@@ -1387,6 +1387,7 @@ macro_rules! define_aes_impl {
             inner: $name,
         }
 
+        #[allow(dead_code)]
         impl $name_dec {
             #[inline(always)]
             pub(crate) fn get_dec_backend(&self) -> $name_back_dec<'_> { self.inner.get_dec_backend() }

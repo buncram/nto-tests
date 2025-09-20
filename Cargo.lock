@@ -33,6 +33,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "bao1x-api"
+version = "0.1.0"
+dependencies = [
+ "num-derive",
+ "num-traits",
+ "xous",
+]
+
+[[package]]
+name = "bao1x-hal"
+version = "0.1.0"
+dependencies = [
+ "bao1x-api",
+ "bitfield",
+ "bitflags",
+ "either",
+ "num-derive",
+ "num-traits",
+ "utralib",
+ "ux-api",
+ "xous",
+ "xous-riscv",
+]
+
+[[package]]
 name = "bare-metal"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -104,31 +129,6 @@ checksum = "3538270d33cc669650c4b093848450d380def10c331d38c768e34cac80576e6e"
 dependencies = [
  "termcolor",
  "unicode-width",
-]
-
-[[package]]
-name = "cramium-api"
-version = "0.1.0"
-dependencies = [
- "num-derive",
- "num-traits",
- "xous",
-]
-
-[[package]]
-name = "cramium-hal"
-version = "0.1.0"
-dependencies = [
- "bitfield",
- "bitflags",
- "cramium-api",
- "either",
- "num-derive",
- "num-traits",
- "utralib",
- "ux-api",
- "xous",
- "xous-riscv",
 ]
 
 [[package]]
@@ -766,9 +766,9 @@ dependencies = [
 name = "tests"
 version = "0.1.0"
 dependencies = [
+ "bao1x-api",
+ "bao1x-hal",
  "cipher",
- "cramium-api",
- "cramium-hal",
  "hex-literal",
  "pio",
  "pio-proc",
@@ -1048,8 +1048,8 @@ dependencies = [
 name = "xous-pl230"
 version = "0.1.0"
 dependencies = [
+ "bao1x-hal",
  "bitfield",
- "cramium-hal",
  "log",
  "pio",
  "pio-proc",
