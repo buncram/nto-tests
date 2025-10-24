@@ -13,6 +13,7 @@
 #![no_main]
 #![allow(unreachable_code)] // allow debugging of failures to jump out of the bootloader
 
+#[cfg(not(feature = "sha-tests"))]
 use cramium_hal::iox::Iox;
 use utralib::generated::*;
 
@@ -261,7 +262,8 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
         bioquick::bio_bypass();
     }
 
-    // setup_io();
+    #[cfg(not(feature = "sha-tests"))]
+    setup_io();
 
     let mut aes_tests = aes::AesTests::new(cfg!(feature = "aes-tests"));
     let mut reset_value_test = utils::ResetValue::new(cfg!(feature = "reset-value-tests"));
@@ -377,6 +379,7 @@ mod panic_handler {
     }
 }
 
+#[cfg(not(feature = "sha-tests"))]
 fn setup_io() {
     let iox = Iox::new(utra::iox::HW_IOX_BASE as *mut u32);
     println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
