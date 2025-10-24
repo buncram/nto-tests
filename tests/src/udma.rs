@@ -1,7 +1,7 @@
 use core::convert::TryInto;
 
-use cramium_api::iox::{IoSetup, IoxDir, IoxDriveStrength, IoxEnable, IoxFunction, IoxPort};
-use cramium_api::{I2cApi, I2cChannel, PeriphId, UdmaGlobalConfig};
+use bao1x_api::iox::{IoSetup, IoxDir, IoxDriveStrength, IoxEnable, IoxFunction, IoxPort};
+use bao1x_api::{I2cApi, I2cChannel, PeriphId, UdmaGlobalConfig};
 use cramium_hal::board::SPIM_FLASH_IFRAM_ADDR;
 use cramium_hal::ifram::IframRange;
 use cramium_hal::iox::Iox;
@@ -150,7 +150,7 @@ impl UdmaTests {
         let mut check = [0u8; 4];
         crate::println!("Rx...");
         match i2c.i2c_read(dev, adr, &mut check, false) {
-            Ok(cramium_api::I2cResult::Ack(len)) => {
+            Ok(bao1x_api::I2cResult::Ack(len)) => {
                 if len != data.len() {
                     crate::println!("rbk length mismatch {} != {}", len, data.len());
                     passing = false;
@@ -197,7 +197,7 @@ impl UdmaTests {
         };
         crate::println!("Rx...");
         match i2c.i2c_read(dev, adr, &mut check, true) {
-            Ok(cramium_api::I2cResult::Ack(len)) => {
+            Ok(bao1x_api::I2cResult::Ack(len)) => {
                 if len != data.len() {
                     crate::println!("rbk length mismatch {} != {}", len, data.len());
                     passing = false;

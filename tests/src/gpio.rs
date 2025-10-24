@@ -10,7 +10,7 @@
 // Please see the [CERN-OHL- W-2.0] for applicable conditions.
 
 use cramium_hal::iox::Iox;
-use cramium_api::iox::{IoxDir, IoxEnable, IoxFunction, IoxPort, IoSetup};
+use bao1x_api::iox::{IoxDir, IoxEnable, IoxFunction, IoxPort, IoSetup};
 use utralib::generated::*;
 
 use crate::println;

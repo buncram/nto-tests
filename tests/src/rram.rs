@@ -10,7 +10,6 @@
 // Please see the [CERN-OHL- W-2.0] for applicable conditions.
 
 use utralib::generated::*;
-use xous_pl230::*;
 
 use crate::utils::*;
 use crate::*;
@@ -285,7 +284,6 @@ impl AlignedBuffer {
 }
 
 pub struct Reram {
-    pl230: xous_pl230::Pl230,
     csr: CSR<u32>,
     array: &'static mut [u32],
 }
@@ -294,7 +292,6 @@ impl Reram {
     pub fn new() -> Self {
         Reram {
             csr: CSR::new(utra::rrc::HW_RRC_BASE as *mut u32),
-            pl230: xous_pl230::Pl230::new(),
             array: unsafe {
                 core::slice::from_raw_parts_mut(
                     utralib::HW_RERAM_MEM as *mut u32,
@@ -395,55 +392,6 @@ impl Reram {
                 cur_offset += chunk.len();
             }
         }
-    }
-
-    pub unsafe fn write_u32_aligned_dma(&mut self, _addr: usize, data: &[u32]) {
-        //assert!(addr % 0x20 == 0, "unaligned destination address!");
-        //assert!(data.len() % 8 == 0, "unaligned source data!");
-        let init_ptr = utralib::HW_IFRAM1_MEM as *mut u32;
-        for i in 0..(4 * 8 * 2) {
-            unsafe { init_ptr.add(i).write_volatile(0) };
-        }
-        let cc_struct: &mut ControlChannels =
-            unsafe { (utralib::HW_IFRAM0_MEM as *mut ControlChannels).as_mut().unwrap() };
-
-        // read the status register
-        self.pl230.csr.wfo(utra::pl230::CFG_MASTER_ENABLE, 1); // enable
-
-        //cc_struct.channels[0].dst_end_ptr = (&self.array[addr / core::mem::size_of::<u32>() + data.len() -
-        // 1]) as *const u32 as u32;
-        cc_struct.channels[0].dst_end_ptr = 0x6010_003C;
-        cc_struct.channels[0].src_end_ptr = (&data[data.len() - 1]) as *const u32 as u32;
-        let mut cc = DmaChanControl(0);
-        cc.set_src_size(DmaWidth::Word as u32);
-        cc.set_src_inc(DmaWidth::Word as u32);
-        cc.set_dst_size(DmaWidth::Word as u32);
-        cc.set_dst_inc(DmaWidth::Word as u32);
-        cc.set_r_power(ArbitrateAfter::Xfer1024 as u32);
-        cc.set_n_minus_1(data.len() as u32 - 1);
-        cc.set_cycle_ctrl(DmaCycleControl::AutoRequest as u32);
-        cc_struct.channels[0].control = cc.0;
-
-        self.pl230.csr.wo(utra::pl230::CTRLBASEPTR, cc_struct.channels.as_ptr() as u32);
-        self.pl230.csr.wo(utra::pl230::CHNLREQMASKSET, 1);
-        self.pl230.csr.wo(utra::pl230::CHNLENABLESET, 1);
-
-        // this should kick off the DMA
-        self.pl230.csr.wo(utra::pl230::CHNLSWREQUEST, 1);
-
-        let mut timeout = 0;
-        while (DmaChanControl(cc_struct.channels[0].control).cycle_ctrl() != 0) && timeout < 16 {
-            // report_api("dma progress ", cc_struct.channels[0].control);
-            report_api(unsafe { cc_struct.channels.as_ptr().read() }.control);
-            timeout += 1;
-        }
-
-        /*
-        // does this also need to be a DMA?
-        self.csr.wo(rrc::RRC_CR, rrc::RRC_CR_WRITE_CMD);
-        self.array[addr / core::mem::size_of::<u32>()] = rrc::RRC_LOAD_BUFFER;
-        self.array[addr / core::mem::size_of::<u32>()] = rrc::RRC_WRITE_BUFFER;
-        self.csr.wo(rrc::RRC_CR, rrc::RRC_CR_NORMAL); */
     }
 }
 

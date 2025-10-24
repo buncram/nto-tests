@@ -11,3 +11,4 @@
 
 mod dma;
 pub use dma::*;
+pub mod combohash;

@@ -24,8 +24,6 @@ mod gpio;
 mod init;
 mod irqs;
 mod mbox;
-#[cfg(feature = "pio")]
-mod pio;
 mod pl230;
 mod ramtests;
 mod rram;
@@ -40,8 +38,6 @@ mod asm;
 mod bioquick;
 
 pub use init::*;
-#[cfg(feature = "pio")]
-pub use pio::*;
 pub use ramtests::*;
 pub use rram::*;
 pub use sce::*;
@@ -52,6 +48,16 @@ mod apb_check;
 mod daric_generated;
 #[cfg(feature = "apb-test")]
 use apb_check::apb_test;
+
+#[global_allocator]
+static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
+pub const RAM_SIZE: usize = utralib::generated::HW_SRAM_MEM_LEN;
+pub const RAM_BASE: usize = utralib::generated::HW_SRAM_MEM;
+
+// Out of way of the SATP test page alloc
+const DATA_SIZE_BYTES: usize = 0x2_0000;
+pub const HEAP_START: usize = RAM_BASE + DATA_SIZE_BYTES;
+pub const HEAP_LEN: usize = 1024 * 256;
 
 /// Boilerplate that we can build into a macro
 pub trait TestBoilerplate {
@@ -247,13 +253,15 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
         }
     }
     uart.tiny_write_str("booting... 001\r");
-    reset_ticktimer();
+    setup_alloc();
+
+    // reset_ticktimer();
     #[cfg(feature = "bio-quick")]
     unsafe {
         bioquick::bio_bypass();
     }
 
-    setup_io();
+    // setup_io();
 
     let mut aes_tests = aes::AesTests::new(cfg!(feature = "aes-tests"));
     let mut reset_value_test = utils::ResetValue::new(cfg!(feature = "reset-value-tests"));
@@ -272,6 +280,7 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
     let mut rram_disturb_tests = rram::RramDisturbTests::new(cfg!(feature = "rram-tests"));
     let mut rram_lifecycle_tests = rram::RramLifecycle::new(cfg!(feature = "lifecycle-tests"));
     let mut udma_tests = udma::UdmaTests::new(cfg!(feature = "udma-tests"));
+    let mut sha_tests = sce::combohash::ShaTests::new(cfg!(feature = "sha-tests"));
 
     // single-purpose test bench. Normally meant to be configured off unless looking specifically at these
     // features.
@@ -279,14 +288,12 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
 
     // legacy tests - not run on NTO
     let mut setup_uart2_test = init::SetupUart2Tests::new(false);
-    #[cfg(feature = "pio")]
-    let mut pio_quick_tests = pio::PioQuickTests::new(false);
     let mut byte_strobe_tests = ramtests::ByteStrobeTests::new(false);
     let mut xip_tests = ramtests::XipTests::new(false);
     let mut sce_dma_tests = sce::SceDmaTests::new(false);
     let mut pl230_tests = pl230::Pl230Tests::new(cfg!(feature = "pl230-tests"));
 
-    let mut tests: [&mut dyn Test; 22] = [
+    let mut tests: [&mut dyn Test; 23] = [
         &mut reset_value_test,
         // stuff to run first
         &mut cam_tests,
@@ -313,12 +320,11 @@ pub unsafe extern "C" fn rust_entry(_unused1: *const usize, _unused2: u32) -> ! 
         &mut setup_uart2_test,
         &mut byte_strobe_tests,
         &mut ram_tests,
-        #[cfg(feature = "pio")]
-        &mut pio_quick_tests,
         &mut xip_tests,
         &mut sce_dma_tests,
         // tests to be run at the end of all the tests
         &mut rram_disturb_tests,
+        &mut sha_tests,
     ];
 
     #[cfg(feature = "apb-test")]
@@ -376,4 +382,13 @@ fn setup_io() {
     println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
     iox.set_ports_from_pio_bitmask(0xFFFF_FFFF);
     println!("piosel {:x}", iox.csr.r(utra::iox::SFR_PIOSEL));
+}
+
+pub fn setup_alloc() {
+    // Initialize the allocator with heap memory range
+    println!("Setting up heap @ {:x}-{:x}", HEAP_START, HEAP_START + HEAP_LEN);
+    println!("Stack @ {:x}-{:x}", HEAP_START + HEAP_LEN, RAM_BASE + RAM_SIZE);
+    unsafe {
+        ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_LEN);
+    }
 }

@@ -484,8 +484,8 @@ pub unsafe fn early_init() {
 // these register do not exist in our local simulation model
 pub fn setup_uart2() {
     const UART_IFRAM_ADDR: usize = utralib::HW_IFRAM0_MEM + utralib::HW_IFRAM0_MEM_LEN - 4096;
-    use cramium_api::iox::{IoxDir, IoxEnable, IoxFunction, IoxPort};
-    use cramium_api::udma::*;
+    use bao1x_api::iox::{IoxDir, IoxEnable, IoxFunction, IoxPort};
+    use bao1x_api::udma::*;
     use cramium_hal::iox::Iox;
     use cramium_hal::udma;
     use cramium_hal::udma::Udma;
