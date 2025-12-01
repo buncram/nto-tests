@@ -17,7 +17,8 @@
 use cramium_hal::iox::Iox;
 use utralib::generated::*;
 
-mod aes;
+mod aes_chaff;
+use aes_chaff as aes;
 mod bio;
 mod cam;
 mod debug;
